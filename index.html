@@ -64,8 +64,13 @@
     }
 
     @keyframes float {
-      0% { transform: translateX(-100px) translateY(-100px); }
-      100% { transform: translateX(0) translateY(0); }
+      0% {
+        transform: translateX(-100px) translateY(-100px);
+      }
+
+      100% {
+        transform: translateX(0) translateY(0);
+      }
     }
 
     .header-content {
@@ -89,9 +94,9 @@
 
     /* Container */
     .container {
-      max-width: 1600px;
+      max-width: calc(100% - 8px);
       margin: 0 auto;
-      padding: 2rem;
+      padding: 1rem;
     }
 
     /* Toolbar */
@@ -131,7 +136,7 @@
       left: -100%;
       width: 100%;
       height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
       transition: left 0.5s;
     }
 
@@ -178,7 +183,7 @@
       background: white;
       border-radius: var(--border-radius-lg);
       box-shadow: var(--card-shadow);
-      padding: 3rem;
+      padding: 1.5rem;
       overflow: hidden;
     }
 
@@ -214,6 +219,7 @@
         opacity: 0;
         transform: translateX(-30px);
       }
+
       to {
         opacity: 1;
         transform: translateX(0);
@@ -473,8 +479,13 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
     }
 
     .modal-content {
@@ -493,6 +504,7 @@
         opacity: 0;
         transform: translateY(30px) scale(0.95);
       }
+
       to {
         opacity: 1;
         transform: translateY(0) scale(1);
@@ -581,8 +593,13 @@
     }
 
     @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
     }
 
     /* Responsive Design */
@@ -701,11 +718,25 @@
     }
 
     /* Utility Classes */
-    .text-center { text-align: center; }
-    .text-muted { color: var(--text-muted); }
-    .mb-0 { margin-bottom: 0; }
-    .mt-2 { margin-top: 0.5rem; }
-    .hidden { display: none; }
+    .text-center {
+      text-align: center;
+    }
+
+    .text-muted {
+      color: var(--text-muted);
+    }
+
+    .mb-0 {
+      margin-bottom: 0;
+    }
+
+    .mt-2 {
+      margin-top: 0.5rem;
+    }
+
+    .hidden {
+      display: none;
+    }
   </style>
 </head>
 
@@ -834,23 +865,23 @@
     let data = null;
     let expandState = {};
     const baseURL = window.location.hostname === 'localhost' ? 'http://localhost:3000/' :
-                                                               'https://web-push-3zaz.onrender.com/';
+      'https://web-push-3zaz.onrender.com/';
 
     // Initialize the application
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
       loadFamilyTree();
     });
 
     // Load family tree data
     function loadFamilyTree() {
 
-      fetch(baseURL +'family')
+      fetch(baseURL + 'family')
         .then(response => response.json())
         .then(json => {
           data = json;
           document.getElementById('loadingState').style.display = 'none';
           document.getElementById('treeContent').style.display = 'block';
-          renderTree();
+          collapseAll();
         })
         .catch(err => {
           document.getElementById('loadingState').innerHTML = `
@@ -1107,7 +1138,7 @@
     }
 
     // Handle form submission
-    document.getElementById('memberForm').addEventListener('submit', function(e) {
+    document.getElementById('memberForm').addEventListener('submit', function (e) {
       e.preventDefault();
 
       const formData = new FormData(this);
@@ -1317,7 +1348,7 @@
       //   URL.revokeObjectURL(url);
       // }, 100);
 
-      await fetch (baseURL + 'family', {
+      await fetch(baseURL + 'family', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -1325,7 +1356,7 @@
         body: jsonStr
       }).then(response => {
         if (response.ok) {
-          alert('Family tree exported successfully!');
+          console.log('Family tree exported successfully!');
         } else {
           alert('Error exporting family tree: ' + response.statusText);
         }
@@ -1340,14 +1371,14 @@
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = function(e) {
+      reader.onload = function (e) {
         try {
           const imported = JSON.parse(e.target.result);
           if (imported.familyName && imported.rootPerson) {
             data = imported;
             expandState = {}; // Reset expansion state
             renderTree();
-            alert('Family tree imported successfully!');
+            console.log('Family tree imported successfully!');
           } else {
             alert('Invalid family tree JSON structure.');
           }
@@ -1362,7 +1393,7 @@
     }
 
     // Close modal when clicking overlay
-    document.getElementById('modal').addEventListener('click', function(e) {
+    document.getElementById('modal').addEventListener('click', function (e) {
       if (e.target === this) {
         closeModal();
       }
