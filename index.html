@@ -1,0 +1,1382 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Professional Family Tree</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Google Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --surface-gradient: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+      --card-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
+      --card-hover-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+      --border-radius: 16px;
+      --border-radius-lg: 24px;
+      --text-primary: #2d3748;
+      --text-secondary: #4a5568;
+      --text-muted: #718096;
+      --border-color: #e2e8f0;
+      --success-color: #48bb78;
+      --warning-color: #ed8936;
+      --danger-color: #f56565;
+      --background: #f7fafc;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--background);
+      color: var(--text-primary);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Header */
+    .header {
+      background: var(--primary-gradient);
+      padding: 3rem 0;
+      text-align: center;
+      box-shadow: var(--card-shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .header::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E") repeat;
+      animation: float 20s infinite linear;
+    }
+
+    @keyframes float {
+      0% { transform: translateX(-100px) translateY(-100px); }
+      100% { transform: translateX(0) translateY(0); }
+    }
+
+    .header-content {
+      position: relative;
+      z-index: 1;
+    }
+
+    .header h1 {
+      font-size: 3rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.5px;
+    }
+
+    .header p {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 1.2rem;
+      font-weight: 300;
+    }
+
+    /* Container */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+
+    /* Toolbar */
+    .toolbar {
+      background: white;
+      border-radius: var(--border-radius);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--card-shadow);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border: none;
+      border-radius: var(--border-radius);
+      font-weight: 500;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      text-decoration: none;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+      transition: left 0.5s;
+    }
+
+    .btn:hover::before {
+      left: 100%;
+    }
+
+    .btn-primary {
+      background: var(--primary-gradient);
+      color: white;
+      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+    }
+
+    .btn-secondary {
+      background: var(--secondary-gradient);
+      color: white;
+      box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    }
+
+    .btn-secondary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 25px rgba(245, 87, 108, 0.6);
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: var(--text-primary);
+      border: 2px solid var(--border-color);
+    }
+
+    .btn-outline:hover {
+      background: var(--text-primary);
+      color: white;
+      border-color: var(--text-primary);
+    }
+
+    /* Tree Container */
+    .tree-container {
+      background: white;
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--card-shadow);
+      padding: 3rem;
+      overflow: hidden;
+    }
+
+    .tree {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      position: relative;
+    }
+
+    .tree-level {
+      position: relative;
+      width: 100%;
+      margin-bottom: 1rem;
+    }
+
+    /* Member Card */
+    .member-card {
+      background: white;
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      border: 2px solid var(--border-color);
+      margin: 0.5rem 0;
+      transition: all 0.3s ease;
+      overflow: hidden;
+      position: relative;
+      animation: slideIn 0.6s ease-out;
+      min-width: 400px;
+    }
+
+    @keyframes slideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .member-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--card-hover-shadow);
+      border-color: #667eea;
+    }
+
+    .member-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: var(--primary-gradient);
+    }
+
+    .card-header {
+      padding: 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .avatar-container {
+      position: relative;
+    }
+
+    .avatar {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: var(--surface-gradient);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      color: var(--text-muted);
+      border: 4px solid white;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 50%;
+    }
+
+    .status-indicator {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: var(--success-color);
+      border: 3px solid white;
+    }
+
+    .member-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .member-name {
+      font-size: 1.6rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .serial-badge {
+      background: var(--primary-gradient);
+      color: white;
+      font-size: 0.75rem;
+      padding: 0.25rem 0.75rem;
+      border-radius: 12px;
+      font-weight: 500;
+    }
+
+    .member-details {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .detail-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1rem;
+      color: var(--text-secondary);
+    }
+
+    .detail-item i {
+      width: 18px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .member-notes {
+      background: #f8fafc;
+      padding: 1.25rem;
+      border-radius: var(--border-radius);
+      margin-top: 1rem;
+      font-style: italic;
+      color: var(--text-secondary);
+      border-left: 4px solid #667eea;
+    }
+
+    /* Actions */
+    .card-actions {
+      padding: 1.5rem 2rem;
+      background: #f8fafc;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .btn-sm {
+      padding: 0.75rem 1.25rem;
+      font-size: 0.9rem;
+      border-radius: 8px;
+    }
+
+    .btn-success {
+      background: var(--success-color);
+      color: white;
+    }
+
+    .btn-warning {
+      background: var(--warning-color);
+      color: white;
+    }
+
+    .btn-danger {
+      background: var(--danger-color);
+      color: white;
+    }
+
+    /* Tree Connections */
+    .tree-connections {
+      margin-left: 3rem;
+      border-left: 3px solid #e2e8f0;
+      padding-left: 2rem;
+      position: relative;
+      transition: all 0.3s ease;
+    }
+
+    .tree-connections::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 0;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #667eea;
+      border: 3px solid white;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 1.5rem 0 1rem 0;
+      padding: 1rem 1.5rem;
+      background: var(--surface-gradient);
+      border-radius: var(--border-radius);
+      border-left: 4px solid #667eea;
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+
+    .section-header:hover {
+      background: rgba(102, 126, 234, 0.05);
+      border-left-color: #764ba2;
+    }
+
+    .toggle-btn {
+      background: none;
+      border: none;
+      color: #667eea;
+      font-size: 1.2rem;
+      cursor: pointer;
+      transition: transform 0.3s ease;
+      padding: 0.25rem;
+      border-radius: 4px;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .toggle-btn:hover {
+      background: rgba(102, 126, 234, 0.1);
+    }
+
+    .toggle-btn.expanded {
+      transform: rotate(90deg);
+    }
+
+    .section-title {
+      font-weight: 600;
+      color: var(--text-primary);
+      font-size: 1.1rem;
+    }
+
+    .section-content {
+      transition: all 0.4s ease;
+      overflow: hidden;
+    }
+
+    .section-content.collapsed {
+      max-height: 0;
+      opacity: 0;
+      margin: 0;
+    }
+
+    .section-content.expanded {
+      max-height: none;
+      opacity: 1;
+    }
+
+    /* Modal */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.6);
+      z-index: 1000;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .modal.show {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: var(--border-radius-lg);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.3);
+      max-width: 600px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.3s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px) scale(0.95);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .modal-header {
+      padding: 2rem 2rem 1rem 2rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-title {
+      font-size: 1.75rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 0.5rem;
+    }
+
+    .modal-subtitle {
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+
+    .modal-body {
+      padding: 2rem;
+    }
+
+    .form-group {
+      margin-bottom: 1.5rem;
+    }
+
+    .form-label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-size: 1rem;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 1rem 1.25rem;
+      border: 2px solid var(--border-color);
+      border-radius: var(--border-radius);
+      font-size: 1rem;
+      transition: all 0.3s ease;
+      background: white;
+    }
+
+    .form-control:focus {
+      outline: none;
+      border-color: #667eea;
+      box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    .modal-footer {
+      padding: 1rem 2rem 2rem 2rem;
+      display: flex;
+      gap: 1rem;
+      justify-content: flex-end;
+    }
+
+    /* Loading State */
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4rem;
+      color: var(--text-muted);
+    }
+
+    .spinner {
+      width: 40px;
+      height: 40px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid #667eea;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-right: 1rem;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Responsive Design */
+    @media (max-width: 1200px) {
+      .container {
+        max-width: 100%;
+        padding: 1.5rem;
+      }
+
+      .member-card {
+        min-width: 350px;
+      }
+
+      .member-details {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .header {
+        padding: 2rem 0;
+      }
+
+      .header h1 {
+        font-size: 2rem;
+      }
+
+      .container {
+        padding: 1rem;
+      }
+
+      .toolbar {
+        flex-direction: column;
+        align-items: stretch;
+        padding: 1.5rem;
+      }
+
+      .btn {
+        justify-content: center;
+        padding: 1rem 1.5rem;
+      }
+
+      .tree-container {
+        padding: 1.5rem;
+      }
+
+      .member-card {
+        min-width: auto;
+        max-width: 100%;
+      }
+
+      .card-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 1rem;
+        padding: 1.5rem;
+      }
+
+      .member-details {
+        grid-template-columns: 1fr;
+      }
+
+      .tree-connections {
+        margin-left: 1rem;
+        padding-left: 1rem;
+      }
+
+      .modal-content {
+        margin: 1rem;
+        max-width: none;
+      }
+
+      .modal-header,
+      .modal-body,
+      .modal-footer {
+        padding: 1.5rem;
+      }
+
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .modal-footer {
+        flex-direction: column;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .header {
+        padding: 1.5rem 0;
+      }
+
+      .header h1 {
+        font-size: 1.75rem;
+      }
+
+      .avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 2rem;
+      }
+
+      .member-name {
+        font-size: 1.3rem;
+      }
+
+      .card-actions {
+        flex-direction: column;
+        padding: 1rem;
+      }
+
+      .tree-connections {
+        margin-left: 0.5rem;
+        padding-left: 0.5rem;
+      }
+    }
+
+    /* Utility Classes */
+    .text-center { text-align: center; }
+    .text-muted { color: var(--text-muted); }
+    .mb-0 { margin-bottom: 0; }
+    .mt-2 { margin-top: 0.5rem; }
+    .hidden { display: none; }
+  </style>
+</head>
+
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-content">
+      <h1 id="familyName">Family Tree</h1>
+      <p>Discover your heritage, preserve your legacy</p>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="exportJSON()">
+        <i class="fas fa-download"></i>
+        Export JSON
+      </button>
+      <label class="btn btn-secondary" style="cursor: pointer;">
+        <i class="fas fa-upload"></i>
+        Import JSON
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importJSON(event)">
+      </label>
+      <button class="btn btn-outline" onclick="expandAll()">
+        <i class="fas fa-expand-arrows-alt"></i>
+        Expand All
+      </button>
+      <button class="btn btn-outline" onclick="collapseAll()">
+        <i class="fas fa-compress-arrows-alt"></i>
+        Collapse All
+      </button>
+    </div>
+
+    <!-- Tree Container -->
+    <div class="tree-container">
+      <div id="loadingState" class="loading">
+        <div class="spinner"></div>
+        Loading family tree...
+      </div>
+      <div id="treeContent" class="tree" style="display: none;"></div>
+    </div>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Add Family Member</h2>
+        <p class="modal-subtitle" id="modalSubtitle">Fill in the information below</p>
+      </div>
+      <div class="modal-body">
+        <form id="memberForm">
+          <div class="form-group">
+            <label class="form-label">Full Name *</label>
+            <input type="text" name="name" class="form-control" required placeholder="Enter full name">
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Gender *</label>
+              <select name="gender" class="form-control" required>
+                <option value="">Select Gender</option>
+                <option value="Male" selected>Male</option>
+                <option value="Female">Female</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Marital Status</label>
+              <select name="maritalStatus" class="form-control">
+                <option value="">Select Status</option>
+                <option value="Single">Single</option>
+                <option value="Married" selected>Married</option>
+                <option value="Divorced">Divorced</option>
+                <option value="Widowed">Widowed</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Date of Birth</label>
+              <input type="date" name="dob" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Date of Death</label>
+              <input type="date" name="dod" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Religion</label>
+            <input type="text" name="religion" class="form-control" value="Muslim" placeholder="Enter religion">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Profile Image URL</label>
+            <input type="url" name="image" class="form-control" placeholder="https://example.com/image.jpg">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Notes</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="Additional information..."></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">
+          <i class="fas fa-times"></i>
+          Cancel
+        </button>
+        <button type="submit" form="memberForm" class="btn btn-primary">
+          <i class="fas fa-save"></i>
+          Save Member
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global variables
+    let data = null;
+    let expandState = {};
+    const baseURL = window.location.hostname === 'localhost' ? 'http://localhost:3000/' :
+                                                               'https://web-push-3zaz.onrender.com/';
+
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', function() {
+      loadFamilyTree();
+    });
+
+    // Load family tree data
+    function loadFamilyTree() {
+
+      fetch(baseURL +'family')
+        .then(response => response.json())
+        .then(json => {
+          data = json;
+          document.getElementById('loadingState').style.display = 'none';
+          document.getElementById('treeContent').style.display = 'block';
+          renderTree();
+        })
+        .catch(err => {
+          document.getElementById('loadingState').innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+            Failed to load family tree: ${err.message}
+          `;
+        });
+    }
+
+    // Render the complete family tree
+    function renderTree() {
+      if (!data || !data.rootPerson) return;
+
+      document.getElementById('familyName').textContent = data.familyName || 'Family Tree';
+      const container = document.getElementById('treeContent');
+      container.innerHTML = '';
+      container.appendChild(renderMember(data.rootPerson, null, 'root', 0));
+    }
+
+    // Render individual family member
+    function renderMember(member, parent, path, level) {
+      const card = document.createElement('div');
+      card.className = 'member-card';
+      card.style.animationDelay = `${level * 0.1}s`;
+      card.setAttribute('data-path', path);
+
+      // Determine if member is deceased
+      const isDeceased = member.dod && member.dod.trim() !== '';
+      const statusColor = isDeceased ? 'var(--text-muted)' : 'var(--success-color)';
+
+      // Avatar HTML
+      const avatarHTML = member.image
+        ? `<img src="${member.image}" alt="${member.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+           <i class="fas fa-user" style="display: none;"></i>`
+        : `<i class="fas fa-user"></i>`;
+
+      // Build member details
+      const details = [
+        { icon: 'venus-mars', label: 'Gender', value: member.gender || 'Not specified' },
+        { icon: 'heart', label: 'Status', value: member.maritalStatus || 'Not specified' },
+        { icon: 'pray', label: 'Religion', value: member.religion || 'Not specified' },
+        { icon: 'calendar-alt', label: 'Born', value: formatDate(member.dob) || 'Unknown' }
+      ];
+
+      if (isDeceased) {
+        details.push({ icon: 'cross', label: 'Died', value: formatDate(member.dod) });
+      }
+
+      const detailsHTML = details.map(detail => `
+        <div class="detail-item">
+          <i class="fas fa-${detail.icon}"></i>
+          <span>${detail.value}</span>
+        </div>
+      `).join('');
+
+      // Main card content
+      card.innerHTML = `
+        <div class="card-header">
+          <div class="avatar-container">
+            <div class="avatar">
+              ${avatarHTML}
+            </div>
+            <div class="status-indicator" style="background: ${statusColor};"></div>
+          </div>
+          <div class="member-info">
+            <div class="member-name">
+              ${member.name}
+              <span class="serial-badge">#${member.serial || 'N/A'}</span>
+            </div>
+            <div class="member-details">
+              ${detailsHTML}
+            </div>
+            ${member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${member.notes}</div>` : ''}
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${path}')">
+            <i class="fas fa-ring"></i> Add Spouse
+          </button>
+          <button class="btn btn-primary btn-sm" onclick="showModal('child', '${path}')">
+            <i class="fas fa-baby"></i> Add Child
+          </button>
+          <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${path}')">
+            <i class="fas fa-edit"></i> Edit
+          </button>
+          ${path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${path}')"><i class="fas fa-trash"></i> Delete</button>` : ''}
+        </div>
+      `;
+
+      // Add spouses section
+      if (member.spouses && member.spouses.length > 0) {
+        const spousesSection = createSection('spouses', path, member, 'Spouses', 'ring', level);
+        card.appendChild(spousesSection);
+      }
+
+      // Add children section
+      if (member.children && member.children.length > 0) {
+        const childrenSection = createSection('children', path, member, 'Children', 'users', level);
+        card.appendChild(childrenSection);
+      }
+
+      return card;
+    }
+
+    // Create expandable section (spouses/children)
+    function createSection(type, path, member, title, icon, level) {
+      const section = document.createElement('div');
+      section.className = 'tree-connections';
+
+      const sectionPath = `${path}.${type}`;
+      const isExp = isExpanded(sectionPath);
+
+      const sectionHeader = document.createElement('div');
+      sectionHeader.className = 'section-header';
+      sectionHeader.innerHTML = `
+        <button class="toggle-btn ${isExp ? 'expanded' : ''}" onclick="toggleSection('${sectionPath}')">
+          <i class="fas fa-chevron-right"></i>
+        </button>
+        <i class="fas fa-${icon}"></i>
+        <span class="section-title">${title} (${member[type].length})</span>
+      `;
+
+      const sectionContent = document.createElement('div');
+      sectionContent.className = `section-content ${isExp ? 'expanded' : 'collapsed'}`;
+      sectionContent.id = `section-${sectionPath.replace(/[\[\].]/g, '-')}`;
+
+      if (isExp) {
+        member[type].forEach((item, i) => {
+          const itemElement = renderMember(item, member, `${path}.${type}[${i}]`, level + 1);
+          sectionContent.appendChild(itemElement);
+        });
+      }
+
+      section.appendChild(sectionHeader);
+      section.appendChild(sectionContent);
+
+      return section;
+    }
+
+    // Optimized toggle section function
+    function toggleSection(sectionPath) {
+      const isCurrentlyExpanded = isExpanded(sectionPath);
+      expandState[sectionPath] = !isCurrentlyExpanded;
+
+      // Find the specific section content
+      const sectionContentId = `section-${sectionPath.replace(/[\[\].]/g, '-')}`;
+      const sectionContent = document.getElementById(sectionContentId);
+      const toggleBtn = sectionContent.parentElement.querySelector('.toggle-btn');
+
+      if (!isCurrentlyExpanded) {
+        // Expanding
+        toggleBtn.classList.add('expanded');
+        sectionContent.className = 'section-content expanded';
+
+        // Get the data and render items
+        const pathParts = sectionPath.split('.');
+        const type = pathParts[pathParts.length - 1];
+        const memberPath = pathParts.slice(0, -1).join('.');
+        const member = getByPath(memberPath);
+
+        // Clear and render items
+        sectionContent.innerHTML = '';
+        if (member[type] && member[type].length > 0) {
+          const level = pathParts.length - 1;
+          member[type].forEach((item, i) => {
+            const itemElement = renderMember(item, member, `${memberPath}.${type}[${i}]`, level);
+            sectionContent.appendChild(itemElement);
+          });
+        }
+      } else {
+        // Collapsing
+        toggleBtn.classList.remove('expanded');
+        sectionContent.className = 'section-content collapsed';
+
+        // Clear content after animation
+        setTimeout(() => {
+          if (sectionContent.classList.contains('collapsed')) {
+            sectionContent.innerHTML = '';
+          }
+        }, 400);
+      }
+    }
+
+    // Check if section is expanded
+    function isExpanded(path) {
+      return expandState[path] !== false; // Default to expanded
+    }
+
+    // Expand all sections
+    function expandAll() {
+      expandState = {};
+      renderTree();
+    }
+
+    // Collapse all sections
+    function collapseAll() {
+      function setAllCollapsed(obj, currentPath) {
+        if (obj.spouses && obj.spouses.length > 0) {
+          expandState[currentPath + '.spouses'] = false;
+          obj.spouses.forEach((spouse, i) => {
+            setAllCollapsed(spouse, currentPath + `.spouses[${i}]`);
+          });
+        }
+        if (obj.children && obj.children.length > 0) {
+          expandState[currentPath + '.children'] = false;
+          obj.children.forEach((child, i) => {
+            setAllCollapsed(child, currentPath + `.children[${i}]`);
+          });
+        }
+      }
+
+      setAllCollapsed(data.rootPerson, 'root');
+      renderTree();
+    }
+
+    // Show modal for adding/editing members
+    function showModal(type, path) {
+      const modal = document.getElementById('modal');
+      const form = document.getElementById('memberForm');
+      const title = document.getElementById('modalTitle');
+      const subtitle = document.getElementById('modalSubtitle');
+
+      // Reset form
+      form.reset();
+
+      let member = {};
+      if (type === 'edit') {
+        member = getByPath(path);
+        title.textContent = 'Edit Family Member';
+        subtitle.textContent = `Update information for ${member.name}`;
+
+        // Populate form with existing data
+        Object.keys(member).forEach(key => {
+          const input = form.querySelector(`[name="${key}"]`);
+          if (input && member[key] !== null && member[key] !== undefined) {
+            input.value = member[key];
+          }
+        });
+      } else {
+        title.textContent = type === 'spouse' ? 'Add Spouse' : 'Add Child';
+        subtitle.textContent = `Add new ${type} to the family tree`;
+      }
+
+      // Store form context
+      form.dataset.type = type;
+      form.dataset.path = path;
+
+      modal.classList.add('show');
+    }
+
+    // Close modal
+    function closeModal() {
+      document.getElementById('modal').classList.remove('show');
+    }
+
+    // Handle form submission
+    document.getElementById('memberForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+
+      const formData = new FormData(this);
+      const memberData = {};
+
+      // Convert form data to object
+      for (let [key, value] of formData.entries()) {
+        if (value.trim()) {
+          memberData[key] = value.trim();
+        }
+      }
+
+      const type = this.dataset.type;
+      const path = this.dataset.path;
+
+      if (type === 'edit') {
+        // Edit existing member
+        const member = getByPath(path);
+        Object.assign(member, memberData);
+
+        // Re-render just this member card
+        const memberCard = document.querySelector(`[data-path="${path}"]`);
+        const newCard = renderMember(member, null, path, 0);
+        memberCard.parentNode.replaceChild(newCard, memberCard);
+
+      } else {
+        // Add new member
+        memberData.serial = getNextSerial(data.rootPerson) + 1;
+        memberData.spouses = [];
+        memberData.children = [];
+
+        const parent = getByPath(path);
+        if (type === 'spouse') {
+          parent.spouses = parent.spouses || [];
+          parent.spouses.push(memberData);
+
+          // Update the spouses section if it exists and is expanded
+          const spousesPath = `${path}.spouses`;
+          if (isExpanded(spousesPath)) {
+            const sectionContentId = `section-${spousesPath.replace(/[\[\].]/g, '-')}`;
+            const sectionContent = document.getElementById(sectionContentId);
+            if (sectionContent) {
+              const newIndex = parent.spouses.length - 1;
+              const newSpouse = renderMember(memberData, parent, `${path}.spouses[${newIndex}]`, path.split('.').length);
+              sectionContent.appendChild(newSpouse);
+            }
+          }
+
+        } else if (type === 'child') {
+          parent.children = parent.children || [];
+          parent.children.push(memberData);
+
+          // Update the children section if it exists and is expanded
+          const childrenPath = `${path}.children`;
+          if (isExpanded(childrenPath)) {
+            const sectionContentId = `section-${childrenPath.replace(/[\[\].]/g, '-')}`;
+            const sectionContent = document.getElementById(sectionContentId);
+            if (sectionContent) {
+              const newIndex = parent.children.length - 1;
+              const newChild = renderMember(memberData, parent, `${path}.children[${newIndex}]`, path.split('.').length);
+              sectionContent.appendChild(newChild);
+            }
+          }
+        }
+
+        // Update section headers to reflect new counts
+        const parentCard = document.querySelector(`[data-path="${path}"]`);
+        if (parentCard) {
+          const sectionHeaders = parentCard.querySelectorAll('.section-title');
+          sectionHeaders.forEach(header => {
+            const text = header.textContent;
+            if (type === 'spouse' && text.includes('Spouses')) {
+              header.textContent = `Spouses (${parent.spouses.length})`;
+            } else if (type === 'child' && text.includes('Children')) {
+              header.textContent = `Children (${parent.children.length})`;
+            }
+          });
+        }
+      }
+
+      closeModal();
+    });
+
+    // Delete member
+    function deleteMember(path) {
+      if (!confirm('Are you sure you want to delete this member and all their descendants?')) {
+        return;
+      }
+
+      const pathParts = path.split('.');
+      const lastPart = pathParts.pop();
+      const parentPath = pathParts.join('.');
+      const parent = getByPath(parentPath);
+
+      const match = lastPart.match(/(\w+)\[(\d+)\]/);
+      if (match) {
+        const arrayName = match[1];
+        const index = parseInt(match[2]);
+        if (parent && parent[arrayName]) {
+          parent[arrayName].splice(index, 1);
+
+          // Remove the member card from DOM
+          const memberCard = document.querySelector(`[data-path="${path}"]`);
+          if (memberCard) {
+            memberCard.remove();
+          }
+
+          // Update section header counts
+          const parentCard = document.querySelector(`[data-path="${parentPath}"]`);
+          if (parentCard) {
+            const sectionHeaders = parentCard.querySelectorAll('.section-title');
+            sectionHeaders.forEach(header => {
+              const text = header.textContent;
+              if (arrayName === 'spouses' && text.includes('Spouses')) {
+                header.textContent = `Spouses (${parent.spouses.length})`;
+              } else if (arrayName === 'children' && text.includes('Children')) {
+                header.textContent = `Children (${parent.children.length})`;
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Get member by path
+    function getByPath(path) {
+      if (path === 'root') return data.rootPerson;
+
+      let obj = data.rootPerson;
+      const regex = /(\w+)\[(\d+)\]/g;
+      let match;
+
+      while ((match = regex.exec(path)) !== null) {
+        const arrayName = match[1];
+        const index = parseInt(match[2]);
+        obj = obj[arrayName][index];
+      }
+
+      return obj;
+    }
+
+    // Get next serial number
+    function getNextSerial(obj, max = 0) {
+      if (!obj) return max;
+
+      if (obj.serial && obj.serial > max) {
+        max = obj.serial;
+      }
+
+      if (obj.spouses) {
+        obj.spouses.forEach(spouse => {
+          if (spouse.serial && spouse.serial > max) {
+            max = spouse.serial;
+          }
+          if (spouse.children) {
+            spouse.children.forEach(child => {
+              max = getNextSerial(child, max);
+            });
+          }
+        });
+      }
+
+      if (obj.children) {
+        obj.children.forEach(child => {
+          max = getNextSerial(child, max);
+        });
+      }
+
+      return max;
+    }
+
+    // Format date for display
+    function formatDate(dateString) {
+      if (!dateString || dateString.trim() === '') return null;
+
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+      } catch (e) {
+        return dateString; // Return original if parsing fails
+      }
+    }
+
+    // Export JSON
+    async function exportJSON() {
+      if (!data) {
+        alert('No data to export');
+        return;
+      }
+
+      const jsonStr = JSON.stringify(data, null, 2);
+      // const blob = new Blob([jsonStr], { type: 'application/json' });
+      // const url = URL.createObjectURL(blob);
+
+      // const a = document.createElement('a');
+      // a.href = url;
+      // a.download = `${data.familyName || 'family_tree'}.json`;
+      // document.body.appendChild(a);
+      // a.click();
+
+      // setTimeout(() => {
+      //   document.body.removeChild(a);
+      //   URL.revokeObjectURL(url);
+      // }, 100);
+
+      await fetch (baseURL + 'family', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: jsonStr
+      }).then(response => {
+        if (response.ok) {
+          alert('Family tree exported successfully!');
+        } else {
+          alert('Error exporting family tree: ' + response.statusText);
+        }
+      }).catch(error => {
+        alert('Error exporting family tree: ' + error.message);
+      });
+    }
+
+    // Import JSON
+    function importJSON(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const imported = JSON.parse(e.target.result);
+          if (imported.familyName && imported.rootPerson) {
+            data = imported;
+            expandState = {}; // Reset expansion state
+            renderTree();
+            alert('Family tree imported successfully!');
+          } else {
+            alert('Invalid family tree JSON structure.');
+          }
+        } catch (err) {
+          alert('Error parsing JSON: ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+
+      // Reset file input
+      event.target.value = '';
+    }
+
+    // Close modal when clicking overlay
+    document.getElementById('modal').addEventListener('click', function(e) {
+      if (e.target === this) {
+        closeModal();
+      }
+    });
+
+    // Global function assignments
+    window.showModal = showModal;
+    window.closeModal = closeModal;
+    window.deleteMember = deleteMember;
+    window.toggleSection = toggleSection;
+    window.expandAll = expandAll;
+    window.collapseAll = collapseAll;
+    window.exportJSON = exportJSON;
+    window.importJSON = importJSON;
+  </script>
+</body>
+</html>
