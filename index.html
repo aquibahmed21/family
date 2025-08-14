@@ -1220,7 +1220,28 @@
       }
 
       closeModal();
+      uploadDataToServer();
     });
+
+    function uploadDataToServer()
+    {
+      const jsonStr = JSON.stringify(data, null, 2);
+      fetch(baseURL + 'family', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: jsonStr
+      }).then(response => {
+        if (response.ok) {
+          console.log('Family tree exported successfully!');
+        } else {
+          alert('Error exporting family tree: ' + response.statusText);
+        }
+      }).catch(error => {
+        alert('Error exporting family tree: ' + error.message);
+      });
+    }
 
     // Delete member
     function deleteMember(path) {
@@ -1261,6 +1282,8 @@
           }
         }
       }
+
+      uploadDataToServer();
     }
 
     // Get member by path
@@ -1334,35 +1357,19 @@
       }
 
       const jsonStr = JSON.stringify(data, null, 2);
-      // const blob = new Blob([jsonStr], { type: 'application/json' });
-      // const url = URL.createObjectURL(blob);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
 
-      // const a = document.createElement('a');
-      // a.href = url;
-      // a.download = `${data.familyName || 'family_tree'}.json`;
-      // document.body.appendChild(a);
-      // a.click();
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.familyName || 'family_tree'}.json`;
+      document.body.appendChild(a);
+      a.click();
 
-      // setTimeout(() => {
-      //   document.body.removeChild(a);
-      //   URL.revokeObjectURL(url);
-      // }, 100);
-
-      await fetch(baseURL + 'family', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: jsonStr
-      }).then(response => {
-        if (response.ok) {
-          console.log('Family tree exported successfully!');
-        } else {
-          alert('Error exporting family tree: ' + response.statusText);
-        }
-      }).catch(error => {
-        alert('Error exporting family tree: ' + error.message);
-      });
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }, 100);
     }
 
     // Import JSON
