@@ -87,6 +87,20 @@
       padding: 1rem;
     }
 
+
+    .container[role="reader"] .card-actions,
+    .container[role="reader"] .toolbar,
+    .container[role="writer"] .toolbar
+    {
+      display: none;
+    }
+
+    .container[role="writer"] .card-actions .btn:not(.btn-warning)
+    {
+      display: none;
+    }
+
+
     /* Toolbar */
     .toolbar {
       background: white;
