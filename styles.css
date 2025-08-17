@@ -367,16 +367,29 @@
     /* Tree Connections */
     .tree-connections {
       margin-left: 3rem;
-      border-left: 3px solid #e2e8f0;
       padding-left: 2rem;
       position: relative;
       transition: all 0.3s ease;
     }
 
-    .tree-connections::before {
+    .tree-connections:has(.expanded) {
+      border-left: 3px solid #e2e8f0;
+    }
+
+    .tree-connections:has(.expanded):after {
+      content: "";
+      position: absolute;
+      bottom: 0px;
+      left: -3px;
+      height: 50%;
+      width: 3px;
+    }
+
+
+    .tree-connections:has(.expanded)::before {
       content: '';
       position: absolute;
-      left: -6px;
+      left: -11px;
       top: 0;
       width: 12px;
       height: 12px;
@@ -679,10 +692,10 @@
     }
 
     @media (max-width: 480px) {
-      .member-card
-      {
+      .member-card {
         animation: unset;
       }
+
       .detail-item {
         gap: 0.25rem;
         font-size: 0.75rem;
