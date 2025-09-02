@@ -934,6 +934,24 @@
       display: none;
     }
 
+    .container[role="reader"] [value="Divorced"],
+    .container[role="writer"] [value="Divorced"],
+    .container[role="reader"] [value="Widowed"],
+    .container[role="writer"] [value="Widowed"],
+    .container[role="reader"] [value="Separated"],
+    .container[role="writer"] [value="Separated"]
+    {
+      display: none;
+    }
+
+    .container[role="admin"] [mValue]::after,
+    .container[role="root"] [mValue]::after
+    {
+      content: " (" attr(mValue) ")";
+      font-weight: 400;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
 
     /* Utility Classes */
     .text-center {

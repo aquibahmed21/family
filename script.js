@@ -1,8 +1,7 @@
 // Global variables
 let data = null;
 let expandState = {};
-const baseURL = window.location.hostname === 'localhost' ? 'http://localhost:3000/' :
-  'https://web-push-3zaz.onrender.com/';
+const baseURL = window.location.hostname === 'localhost' ? 'http://localhost:3000/' : 'https://web-push-3zaz.onrender.com/';
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function () {
@@ -73,7 +72,7 @@ function renderMember(member, parent, path, level) {
   }
 
   const detailsHTML = details.map(detail => `
-        <div class="detail-item">
+        <div class="detail-item" value="${detail.value}">
           <i class="fas fa-${detail.icon}"></i>
           <span>${detail.value}</span>
         </div>
@@ -146,7 +145,7 @@ function createSection(type, path, member, title, icon, level) {
           <i class="fas fa-chevron-right"></i>
         </button>
         <i class="fas fa-${icon}"></i>
-        <span class="section-title">${title} (${member[type].length})</span>
+        <span class="section-title" mValue="${member[type].length}">${title}</span>
       `;
 
   sectionHeader.onclick = () => toggleSection(sectionPath);
@@ -373,9 +372,11 @@ document.getElementById('memberForm').addEventListener('submit', function (e) {
       sectionHeaders.forEach(header => {
         const text = header.textContent;
         if (type === 'spouse' && text.includes('Spouses')) {
-          header.textContent = `Spouses (${parent.spouses.length})`;
+          header.textContent = `Spouses`;
+          header.setAttribute("mValue", parent.spouses.length);
         } else if (type === 'child' && text.includes('Children')) {
           header.textContent = `Children (${parent.children.length})`;
+          header.setAttribute("mValue", parent.children.length);
         }
       });
     }
@@ -435,9 +436,11 @@ function deleteMember(path) {
         sectionHeaders.forEach(header => {
           const text = header.textContent;
           if (arrayName === 'spouses' && text.includes('Spouses')) {
-            header.textContent = `Spouses (${parent.spouses.length})`;
+            header.textContent = `Spouses`;
+            header.setAttribute("value", parent.spouses.length);
           } else if (arrayName === 'children' && text.includes('Children')) {
-            header.textContent = `Children (${parent.children.length})`;
+            header.textContent = `Children`;
+            header.setAttribute("value", parent.children.length);
           }
         });
       }
