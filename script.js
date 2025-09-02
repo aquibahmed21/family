@@ -232,8 +232,10 @@ async function onDBClick() {
     if (["root", "admin", "writer", "reader"].includes(role)) {
       localStorage.setItem("role", role);
       document.querySelector(".container").setAttribute("role", role);
+      return;
     }
   }
+  document.querySelector(".container").setAttribute("role", "reader");
 }
 
 // Collapse all sections
