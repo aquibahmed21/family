@@ -10,8 +10,8 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Stylesheet -->
-  <script type="module" crossorigin src="/family/assets/index-B4oWX-c2.js"></script>
-  <link rel="stylesheet" crossorigin href="/family/assets/index-BzUGnmsC.css">
+  <script type="module" crossorigin src="/family/assets/index-D-vk6Q6t.js"></script>
+  <link rel="stylesheet" crossorigin href="/family/assets/index-BodZLUEW.css">
 </head>
 
 <body>
@@ -44,6 +44,56 @@
         <i class="fas fa-compress-arrows-alt"></i>
         Collapse All
       </button>
+    </div>
+
+    <!-- Filters Panel -->
+    <div class="filter-panel">
+      <div class="filters">
+        <div class="search-box" style="min-width:280px;">
+          <i class="fas fa-search"></i>
+          <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
+          <button id="clearSearchBtn" class="clear-input" type="button" title="Clear search"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="filter-item">
+          <label>Gender</label>
+          <select id="filterGender">
+            <option value="">Any</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Marital Status</label>
+          <select id="filterMarital">
+            <option value="">Any</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+            <option value="Separated">Separated</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Has Children</label>
+          <select id="filterChildren">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Has Spouses</label>
+          <select id="filterSpouses">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <button class="btn btn-outline" id="applyFiltersBtn"><i class="fas fa-filter"></i> Apply Filters</button>
+        <button class="btn btn-outline" id="clearFiltersBtn"><i class="fas fa-eraser"></i> Clear Filters</button>
+      </div>
+      <div class="results-header"><span id="resultsCount"></span></div>
+      <div id="filterResults" class="results-list"></div>
     </div>
 
     <!-- Tree Container -->
@@ -194,6 +244,7 @@
     </div>
   </div>
 
+  <button id="backToResultsBtn" class="back-results-btn" style="display:none;" title="Back to results"><i class="fas fa-arrow-left"></i> Back to results</button>
 </body>
 
 </html>
