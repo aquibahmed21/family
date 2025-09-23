@@ -51,6 +51,7 @@
         <div class="search-box" style="min-width:280px;">
           <i class="fas fa-search"></i>
           <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
+          <button id="clearSearchBtn" class="clear-input" type="button" title="Clear search"><i class="fas fa-times"></i></button>
         </div>
         <div class="filter-item">
           <label>Gender</label>
@@ -90,6 +91,7 @@
         <button class="btn btn-outline" id="applyFiltersBtn"><i class="fas fa-filter"></i> Apply Filters</button>
         <button class="btn btn-outline" id="clearFiltersBtn"><i class="fas fa-eraser"></i> Clear Filters</button>
       </div>
+      <div class="results-header"><span id="resultsCount"></span></div>
       <div id="filterResults" class="results-list"></div>
     </div>
 

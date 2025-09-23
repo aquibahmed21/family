@@ -134,12 +134,18 @@ function setupSearchAndFilters() {
       resultsBox.innerHTML = '';
     }
     lastResultsHTML = unifiedList.innerHTML;
+    const countEl = document.getElementById('resultsCount');
+    if (countEl) countEl.textContent = filtered.length ? `Results (${filtered.length})` : '';
   }
 
-  let debounceId = null;
+  // Debounce using animation frames instead of timeouts
+  let rafId = null;
   input.addEventListener('input', () => {
-    clearTimeout(debounceId);
-    debounceId = setTimeout(computeAndRenderResults, 150);
+    if (rafId) cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(() => {
+      computeAndRenderResults();
+      rafId = null;
+    });
   });
 
   applyBtn.addEventListener('click', computeAndRenderResults);
@@ -156,6 +162,16 @@ function setupSearchAndFilters() {
       if (spousesSel) spousesSel.value = '';
       if (input) input.value = '';
       unifiedList.innerHTML = '';
+      const countEl = document.getElementById('resultsCount');
+      if (countEl) countEl.textContent = '';
+    });
+  }
+
+  const clearSearchBtn = document.getElementById('clearSearchBtn');
+  if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+      if (input) input.value = '';
+      computeAndRenderResults();
     });
   }
 
@@ -168,42 +184,45 @@ function setupSearchAndFilters() {
 }
 
 // Expand sections along a path and scroll to the card
-function navigateToPath(path) {
+async function navigateToPath(path) {
   if (!path) return;
   const backBtn = document.getElementById('backToResultsBtn');
   if (backBtn) backBtn.style.display = 'inline-flex';
-  // Expand required sections for the path
-  const parts = path.split('.');
+  // Expand required sections for the path by walking ancestor arrays
   const sectionPaths = [];
-  for (let i = 0; i < parts.length - 1; i++) {
-    const part = parts.slice(0, i + 1).join('.');
-    if (part.endsWith('spouses') || part.endsWith('children') || /\.(spouses|children)\[\d+\]$/.test(part)) {
-      const sect = part.replace(/\[\d+\]$/, '').replace(/\.(\w+)$/, '.$1');
-      const normalized = sect.endsWith('.spouses') || sect.endsWith('.children') ? sect : null;
-      if (normalized) sectionPaths.push(normalized);
-    }
+  let prefix = 'root';
+  const regex = /(?:^|\.)((?:spouses|children))\[(\d+)\]/g;
+  let m;
+  while ((m = regex.exec(path)) !== null) {
+    const type = m[1];
+    const index = m[2];
+    sectionPaths.push(`${prefix}.${type}`);
+    prefix = `${prefix}.${type}[${index}]`;
   }
   // Ensure sections expansion flags are set
   sectionPaths.forEach(sp => { expandState[sp] = true; });
   // Re-render from root to realize expanded sections
   renderTree();
   // After render, if some sections were not expanded via flags, toggle them
-  sectionPaths.forEach(sp => {
+  for (const sp of sectionPaths) {
     const id = `section-${sp.replace(/[\[\].]/g, '-')}`;
     const el = document.getElementById(id);
     if (el && el.classList.contains('collapsed')) {
       toggleSection(sp);
+      // wait next frame so DOM updates before proceeding
+      await new Promise(r => requestAnimationFrame(r));
     }
-  });
-  // Scroll to the member card
-  setTimeout(() => {
-    const card = document.querySelector(`.member-card[data-path="${path}"]`);
-    if (card) {
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.classList.add('highlight');
-      setTimeout(() => card.classList.remove('highlight'), 1200);
-    }
-  }, 50);
+  }
+  // Scroll to the member card and highlight
+  await new Promise(r => requestAnimationFrame(r));
+  const card = document.querySelector(`.member-card[data-path="${path}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('highlight');
+    card.addEventListener('animationend', () => {
+      card.classList.remove('highlight');
+    }, { once: true });
+  }
 }
 
 // Render individual family member
@@ -371,12 +390,14 @@ function toggleSection(sectionPath) {
     treeConnections.classList.remove('expanded');
     sectionContent.className = 'section-content collapsed';
 
-    // Clear content after animation
-    setTimeout(() => {
+    // Clear content after transition ends
+    const onEnd = () => {
+      sectionContent.removeEventListener('transitionend', onEnd);
       if (sectionContent.classList.contains('collapsed')) {
         sectionContent.innerHTML = '';
       }
-    }, 400);
+    };
+    sectionContent.addEventListener('transitionend', onEnd);
   }
 }
 
