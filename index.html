@@ -45,6 +45,54 @@
       </button>
     </div>
 
+    <!-- Filters Panel -->
+    <div class="filter-panel">
+      <div class="filters">
+        <div class="search-box" style="min-width:280px;">
+          <i class="fas fa-search"></i>
+          <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
+        </div>
+        <div class="filter-item">
+          <label>Gender</label>
+          <select id="filterGender">
+            <option value="">Any</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Marital Status</label>
+          <select id="filterMarital">
+            <option value="">Any</option>
+            <option value="Single">Single</option>
+            <option value="Married">Married</option>
+            <option value="Divorced">Divorced</option>
+            <option value="Widowed">Widowed</option>
+            <option value="Separated">Separated</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Has Children</label>
+          <select id="filterChildren">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <div class="filter-item">
+          <label>Has Spouses</label>
+          <select id="filterSpouses">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+          </select>
+        </div>
+        <button class="btn btn-outline" id="applyFiltersBtn"><i class="fas fa-filter"></i> Apply Filters</button>
+        <button class="btn btn-outline" id="clearFiltersBtn"><i class="fas fa-eraser"></i> Clear Filters</button>
+      </div>
+      <div id="filterResults" class="results-list"></div>
+    </div>
+
     <!-- Tree Container -->
     <div class="tree-container">
       <div id="loadingState" class="loading">
@@ -194,6 +242,7 @@
   </div>
 
   <script type="module" src="script.js"></script>
+  <button id="backToResultsBtn" class="back-results-btn" style="display:none;" title="Back to results"><i class="fas fa-arrow-left"></i> Back to results</button>
 </body>
 
 </html>

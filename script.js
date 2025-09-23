@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', function () {
   document.querySelector(".container").setAttribute("role", role);
 
   loadFamilyTree();
+
+  // Wire up search and filters once DOM is ready
+  setupSearchAndFilters();
 });
 
 // Load family tree data
@@ -38,6 +41,169 @@ function renderTree() {
   const container = document.getElementById('treeContent');
   container.innerHTML = '';
   container.appendChild(renderMember(data.rootPerson, null, 'root', 0));
+}
+
+// Build a flat list of all members with their paths
+function collectMembers() {
+  const results = [];
+  function walk(member, path) {
+    if (!member) return;
+    results.push({
+      name: member.name || '',
+      serial: member.serial || null,
+      gender: member.gender || '',
+      maritalStatus: member.maritalStatus || '',
+      spousesCount: (member.spouses && member.spouses.length) || 0,
+      childrenCount: (member.children && member.children.length) || 0,
+      path
+    });
+    if (member.spouses) {
+      member.spouses.forEach((sp, i) => walk(sp, `${path}.spouses[${i}]`));
+    }
+    if (member.children) {
+      member.children.forEach((ch, i) => walk(ch, `${path}.children[${i}]`));
+    }
+  }
+  if (data && data.rootPerson) walk(data.rootPerson, 'root');
+  return results;
+}
+
+function setupSearchAndFilters() {
+  const input = document.getElementById('searchInput');
+  const resultsBox = document.getElementById('searchResults');
+  const applyBtn = document.getElementById('applyFiltersBtn');
+  const clearBtn = document.getElementById('clearFiltersBtn');
+  const backBtn = document.getElementById('backToResultsBtn');
+  const genderSel = document.getElementById('filterGender');
+  const maritalSel = document.getElementById('filterMarital');
+  const childrenSel = document.getElementById('filterChildren');
+  const spousesSel = document.getElementById('filterSpouses');
+  const unifiedList = document.getElementById('filterResults');
+  if (!input || !applyBtn || !unifiedList) return;
+
+  const getCurrentRole = () => document.querySelector('.container')?.getAttribute('role') || 'reader';
+
+  // store last results HTML to restore
+  let lastResultsHTML = '';
+
+  function computeAndRenderResults() {
+    const q = (input.value || '').trim().toLowerCase();
+    const gender = genderSel?.value || '';
+    const marital = maritalSel?.value || '';
+    const children = childrenSel?.value || '';
+    const spouses = spousesSel?.value || '';
+    const members = collectMembers();
+    const filtered = members.filter(m => {
+      // filters
+      if (gender && m.gender !== gender) return false;
+      if (marital && m.maritalStatus !== marital) return false;
+      if (children === 'yes' && m.childrenCount <= 0) return false;
+      if (children === 'no' && m.childrenCount > 0) return false;
+      if (spouses === 'yes' && m.spousesCount <= 0) return false;
+      if (spouses === 'no' && m.spousesCount > 0) return false;
+      // query
+      if (q) {
+        const nameHit = m.name.toLowerCase().includes(q);
+        const serialHit = q.startsWith('#')
+          ? (m.serial !== null && (`#${m.serial}` === q))
+          : (m.serial !== null && (`${m.serial}` === q));
+        if (!nameHit && !serialHit) return false;
+      }
+      return true;
+    }).slice(0, 300);
+
+    const role = getCurrentRole();
+    unifiedList.innerHTML = filtered.length ? filtered.map(m => {
+      const displayName = role === 'reader' ? 'Private' : (m.name || 'Unnamed');
+      const maritalOut = role === 'reader' ? '' : (m.maritalStatus ? ' · ' + m.maritalStatus : '');
+      return `<div class="result-item" data-path="${m.path}">
+         <strong>${displayName}</strong>
+         <small>#${m.serial ?? 'N/A'} · ${m.gender}${maritalOut} · Sp:${m.spousesCount} · Ch:${m.childrenCount}</small>
+       </div>`;
+    }).join('') : '<div class="text-muted">No results</div>';
+
+    unifiedList.onclick = (e) => {
+      const item = e.target.closest('.result-item');
+      if (!item) return;
+      navigateToPath(item.getAttribute('data-path'));
+    };
+
+    // hide standalone search box results if any
+    if (resultsBox) {
+      resultsBox.style.display = 'none';
+      resultsBox.innerHTML = '';
+    }
+    lastResultsHTML = unifiedList.innerHTML;
+  }
+
+  let debounceId = null;
+  input.addEventListener('input', () => {
+    clearTimeout(debounceId);
+    debounceId = setTimeout(computeAndRenderResults, 150);
+  });
+
+  applyBtn.addEventListener('click', computeAndRenderResults);
+  genderSel?.addEventListener('change', computeAndRenderResults);
+  maritalSel?.addEventListener('change', computeAndRenderResults);
+  childrenSel?.addEventListener('change', computeAndRenderResults);
+  spousesSel?.addEventListener('change', computeAndRenderResults);
+
+  if (clearBtn) {
+    clearBtn.addEventListener('click', () => {
+      if (genderSel) genderSel.value = '';
+      if (maritalSel) maritalSel.value = '';
+      if (childrenSel) childrenSel.value = '';
+      if (spousesSel) spousesSel.value = '';
+      if (input) input.value = '';
+      unifiedList.innerHTML = '';
+    });
+  }
+
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      unifiedList.innerHTML = lastResultsHTML;
+      backBtn.style.display = 'none';
+    });
+  }
+}
+
+// Expand sections along a path and scroll to the card
+function navigateToPath(path) {
+  if (!path) return;
+  const backBtn = document.getElementById('backToResultsBtn');
+  if (backBtn) backBtn.style.display = 'inline-flex';
+  // Expand required sections for the path
+  const parts = path.split('.');
+  const sectionPaths = [];
+  for (let i = 0; i < parts.length - 1; i++) {
+    const part = parts.slice(0, i + 1).join('.');
+    if (part.endsWith('spouses') || part.endsWith('children') || /\.(spouses|children)\[\d+\]$/.test(part)) {
+      const sect = part.replace(/\[\d+\]$/, '').replace(/\.(\w+)$/, '.$1');
+      const normalized = sect.endsWith('.spouses') || sect.endsWith('.children') ? sect : null;
+      if (normalized) sectionPaths.push(normalized);
+    }
+  }
+  // Ensure sections expansion flags are set
+  sectionPaths.forEach(sp => { expandState[sp] = true; });
+  // Re-render from root to realize expanded sections
+  renderTree();
+  // After render, if some sections were not expanded via flags, toggle them
+  sectionPaths.forEach(sp => {
+    const id = `section-${sp.replace(/[\[\].]/g, '-')}`;
+    const el = document.getElementById(id);
+    if (el && el.classList.contains('collapsed')) {
+      toggleSection(sp);
+    }
+  });
+  // Scroll to the member card
+  setTimeout(() => {
+    const card = document.querySelector(`.member-card[data-path="${path}"]`);
+    if (card) {
+      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      card.classList.add('highlight');
+      setTimeout(() => card.classList.remove('highlight'), 1200);
+    }
+  }, 50);
 }
 
 // Render individual family member
@@ -583,3 +749,4 @@ window.collapseAll = collapseAll;
 window.exportJSON = exportJSON;
 window.importJSON = importJSON;
 window.onDBClick = onDBClick;
+window.navigateToPath = navigateToPath;
