@@ -1,7 +1,7 @@
 // Global variables
 let data = null;
 let expandState = {};
-const baseURL = window.location.hostname === 'localhost' ? 'http://localhost:3000/' : 'https://web-push-3zaz.onrender.com/';
+const baseURL = 'https://web-push-3zaz.onrender.com/';
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function () {
@@ -15,12 +15,20 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 
 // Load family tree data
-function loadFamilyTree() {
-
+function loadFamilyTree ()
+{
+  data = retrieveJsonLocally();
+  if (data) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('treeContent').style.display = 'block';
+    collapseAll();
+    return;
+  }
   fetch(baseURL + 'family')
     .then(response => response.json())
     .then(json => {
       data = json;
+      storeJsonLocally(data);
       document.getElementById('loadingState').style.display = 'none';
       document.getElementById('treeContent').style.display = 'block';
       collapseAll();
@@ -758,7 +766,28 @@ document.getElementById('modal').addEventListener('click', function (e) {
   if (e.target === this) {
     closeModal();
   }
-});
+} );
+
+
+function storeJsonLocally ( data )
+{
+  localStorage.setItem('familyTreeData', JSON.stringify(data));
+}
+
+function retrieveJsonLocally ()
+{
+  const data = localStorage.getItem( 'familyTreeData' );
+  if (!data) return null;
+  return JSON.parse(data);
+}
+
+function isUpdateRequired ( data )
+{
+  const storedData = retrieveJsonLocally();
+  if (!storedData) return true;
+  if (!storedData.date) return true;
+  return storedData.date !== data.date;
+}
 
 // Global function assignments
 window.showModal = showModal;
