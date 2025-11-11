@@ -22,16 +22,18 @@ function loadFamilyTree ()
     document.getElementById('loadingState').style.display = 'none';
     document.getElementById('treeContent').style.display = 'block';
     collapseAll();
-    return;
+
   }
   fetch(baseURL + 'family')
     .then(response => response.json())
     .then(json => {
-      data = json;
-      storeJsonLocally(data);
-      document.getElementById('loadingState').style.display = 'none';
-      document.getElementById('treeContent').style.display = 'block';
-      collapseAll();
+      if (isUpdateRequired(json)) {
+        data = json;
+        storeJsonLocally(data);
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('treeContent').style.display = 'block';
+        collapseAll();
+      }
     })
     .catch(err => {
       document.getElementById('loadingState').innerHTML = `
@@ -583,7 +585,10 @@ document.getElementById('memberForm').addEventListener('submit', function (e) {
   uploadDataToServer();
 });
 
-function uploadDataToServer() {
+function uploadDataToServer ()
+{
+  if ( !data.date )
+    data.date = new Date().getTime();
   const jsonStr = JSON.stringify(data, null, 2);
   fetch(baseURL + 'family', {
     method: 'POST',
