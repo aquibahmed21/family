@@ -4,251 +4,270 @@ let expandState = {};
 const baseURL = 'https://web-push-3zaz.onrender.com/';
 
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function () {
-  const role = localStorage.getItem("role") || "reader";
-  document.querySelector(".container").setAttribute("role", role);
+document.addEventListener( 'DOMContentLoaded', function ()
+{
+  const role = localStorage.getItem( "role" ) || "reader";
+  document.querySelector( ".container" ).setAttribute( "role", role );
 
   loadFamilyTree();
 
   // Wire up search and filters once DOM is ready
   setupSearchAndFilters();
-});
+} );
 
 // Load family tree data
 function loadFamilyTree ()
 {
   data = retrieveJsonLocally();
-  if (data) {
-    document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('treeContent').style.display = 'block';
+  if ( data ) {
+    document.getElementById( 'loadingState' ).style.display = 'none';
+    document.getElementById( 'treeContent' ).style.display = 'block';
     collapseAll();
-
+    document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
   }
-  fetch(baseURL + 'family')
-    .then(response => response.json())
-    .then(json => {
-      if (isUpdateRequired(json)) {
+  fetch( baseURL + 'family' )
+    .then( response => response.json() )
+    .then( json =>
+    {
+      if ( isUpdateRequired( json ) ) {
         data = json;
-        storeJsonLocally(data);
-        document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('treeContent').style.display = 'block';
+        storeJsonLocally( data );
+        document.getElementById( 'loadingState' ).style.display = 'none';
+        document.getElementById( 'treeContent' ).style.display = 'block';
         collapseAll();
       }
-    })
-    .catch(err => {
-      document.getElementById('loadingState').innerHTML = `
+    } )
+    .catch( err =>
+    {
+      document.getElementById( 'loadingState' ).innerHTML = `
             <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
-            Failed to load family tree: ${err.message}
+            Failed to load family tree: ${ err.message }
           `;
-    });
+    } );
 }
 
 // Render the complete family tree
-function renderTree() {
-  if (!data || !data.rootPerson) return;
+function renderTree ()
+{
+  if ( !data || !data.rootPerson ) return;
 
-  document.getElementById('familyName').textContent = data.familyName || 'Family Tree';
-  const container = document.getElementById('treeContent');
+  document.getElementById( 'familyName' ).textContent = data.familyName || 'Family Tree';
+  const container = document.getElementById( 'treeContent' );
   container.innerHTML = '';
-  container.appendChild(renderMember(data.rootPerson, null, 'root', 0));
+  container.appendChild( renderMember( data.rootPerson, null, 'root', 0 ) );
 }
 
 // Build a flat list of all members with their paths
-function collectMembers() {
+function collectMembers ()
+{
   const results = [];
-  function walk(member, path) {
-    if (!member) return;
-    results.push({
+  function walk ( member, path )
+  {
+    if ( !member ) return;
+    results.push( {
       name: member.name || '',
       serial: member.serial || null,
       gender: member.gender || '',
       maritalStatus: member.maritalStatus || '',
-      spousesCount: (member.spouses && member.spouses.length) || 0,
-      childrenCount: (member.children && member.children.length) || 0,
+      spousesCount: ( member.spouses && member.spouses.length ) || 0,
+      childrenCount: ( member.children && member.children.length ) || 0,
       path
-    });
-    if (member.spouses) {
-      member.spouses.forEach((sp, i) => walk(sp, `${path}.spouses[${i}]`));
+    } );
+    if ( member.spouses ) {
+      member.spouses.forEach( ( sp, i ) => walk( sp, `${ path }.spouses[${ i }]` ) );
     }
-    if (member.children) {
-      member.children.forEach((ch, i) => walk(ch, `${path}.children[${i}]`));
+    if ( member.children ) {
+      member.children.forEach( ( ch, i ) => walk( ch, `${ path }.children[${ i }]` ) );
     }
   }
-  if (data && data.rootPerson) walk(data.rootPerson, 'root');
+  if ( data && data.rootPerson ) walk( data.rootPerson, 'root' );
   return results;
 }
 
-function setupSearchAndFilters() {
-  const input = document.getElementById('searchInput');
-  const resultsBox = document.getElementById('searchResults');
-  const applyBtn = document.getElementById('applyFiltersBtn');
-  const clearBtn = document.getElementById('clearFiltersBtn');
-  const backBtn = document.getElementById('backToResultsBtn');
-  const genderSel = document.getElementById('filterGender');
-  const maritalSel = document.getElementById('filterMarital');
-  const childrenSel = document.getElementById('filterChildren');
-  const spousesSel = document.getElementById('filterSpouses');
-  const unifiedList = document.getElementById('filterResults');
-  if (!input || !applyBtn || !unifiedList) return;
+function setupSearchAndFilters ()
+{
+  const input = document.getElementById( 'searchInput' );
+  const resultsBox = document.getElementById( 'searchResults' );
+  const applyBtn = document.getElementById( 'applyFiltersBtn' );
+  const clearBtn = document.getElementById( 'clearFiltersBtn' );
+  const backBtn = document.getElementById( 'backToResultsBtn' );
+  const genderSel = document.getElementById( 'filterGender' );
+  const maritalSel = document.getElementById( 'filterMarital' );
+  const childrenSel = document.getElementById( 'filterChildren' );
+  const spousesSel = document.getElementById( 'filterSpouses' );
+  const unifiedList = document.getElementById( 'filterResults' );
+  if ( !input || !applyBtn || !unifiedList ) return;
 
-  const getCurrentRole = () => document.querySelector('.container')?.getAttribute('role') || 'reader';
+  const getCurrentRole = () => document.querySelector( '.container' )?.getAttribute( 'role' ) || 'reader';
 
   // store last results HTML to restore
   let lastResultsHTML = '';
 
-  function computeAndRenderResults() {
-    const q = (input.value || '').trim().toLowerCase();
+  function computeAndRenderResults ()
+  {
+    const q = ( input.value || '' ).trim().toLowerCase();
     const gender = genderSel?.value || '';
     const marital = maritalSel?.value || '';
     const children = childrenSel?.value || '';
     const spouses = spousesSel?.value || '';
     const members = collectMembers();
-    const filtered = members.filter(m => {
+    const filtered = members.filter( m =>
+    {
       // filters
-      if (gender && m.gender !== gender) return false;
-      if (marital && m.maritalStatus !== marital) return false;
-      if (children === 'yes' && m.childrenCount <= 0) return false;
-      if (children === 'no' && m.childrenCount > 0) return false;
-      if (spouses === 'yes' && m.spousesCount <= 0) return false;
-      if (spouses === 'no' && m.spousesCount > 0) return false;
+      if ( gender && m.gender !== gender ) return false;
+      if ( marital && m.maritalStatus !== marital ) return false;
+      if ( children === 'yes' && m.childrenCount <= 0 ) return false;
+      if ( children === 'no' && m.childrenCount > 0 ) return false;
+      if ( spouses === 'yes' && m.spousesCount <= 0 ) return false;
+      if ( spouses === 'no' && m.spousesCount > 0 ) return false;
       // query
-      if (q) {
-        const nameHit = m.name.toLowerCase().includes(q);
-        const serialHit = q.startsWith('#')
-          ? (m.serial !== null && (`#${m.serial}` === q))
-          : (m.serial !== null && (`${m.serial}` === q));
-        if (!nameHit && !serialHit) return false;
+      if ( q ) {
+        const nameHit = m.name.toLowerCase().includes( q );
+        const serialHit = q.startsWith( '#' )
+          ? ( m.serial !== null && ( `#${ m.serial }` === q ) )
+          : ( m.serial !== null && ( `${ m.serial }` === q ) );
+        if ( !nameHit && !serialHit ) return false;
       }
       return true;
-    }).slice(0, 300);
+    } ).slice( 0, 300 );
 
     const role = getCurrentRole();
-    unifiedList.innerHTML = filtered.length ? filtered.map(m => {
-      const displayName = role === 'reader' ? 'Private' : (m.name || 'Unnamed');
-      const maritalOut = role === 'reader' ? '' : (m.maritalStatus ? ' · ' + m.maritalStatus : '');
-      return `<div class="result-item" data-path="${m.path}">
-         <strong>${displayName}</strong>
-         <small>#${m.serial ?? 'N/A'} · ${m.gender}${maritalOut} · Sp:${m.spousesCount} · Ch:${m.childrenCount}</small>
+    unifiedList.innerHTML = filtered.length ? filtered.map( m =>
+    {
+      const displayName = role === 'reader' ? 'Private' : ( m.name || 'Unnamed' );
+      const maritalOut = role === 'reader' ? '' : ( m.maritalStatus ? ' · ' + m.maritalStatus : '' );
+      return `<div class="result-item" data-path="${ m.path }">
+         <strong>${ displayName }</strong>
+         <small>#${ m.serial ?? 'N/A' } · ${ m.gender }${ maritalOut } · Sp:${ m.spousesCount } · Ch:${ m.childrenCount }</small>
        </div>`;
-    }).join('') : '<div class="text-muted">No results</div>';
+    } ).join( '' ) : '<div class="text-muted">No results</div>';
 
-    unifiedList.onclick = (e) => {
-      const item = e.target.closest('.result-item');
-      if (!item) return;
-      navigateToPath(item.getAttribute('data-path'));
+    unifiedList.onclick = ( e ) =>
+    {
+      const item = e.target.closest( '.result-item' );
+      if ( !item ) return;
+      navigateToPath( item.getAttribute( 'data-path' ) );
     };
 
     // hide standalone search box results if any
-    if (resultsBox) {
+    if ( resultsBox ) {
       resultsBox.style.display = 'none';
       resultsBox.innerHTML = '';
     }
     lastResultsHTML = unifiedList.innerHTML;
-    const countEl = document.getElementById('resultsCount');
-    if (countEl) countEl.textContent = filtered.length ? `Results (${filtered.length})` : '';
+    const countEl = document.getElementById( 'resultsCount' );
+    if ( countEl ) countEl.textContent = filtered.length ? `Results (${ filtered.length })` : '';
   }
 
   // Debounce using animation frames instead of timeouts
   let rafId = null;
-  input.addEventListener('input', () => {
-    if (rafId) cancelAnimationFrame(rafId);
-    rafId = requestAnimationFrame(() => {
+  input.addEventListener( 'input', () =>
+  {
+    if ( rafId ) cancelAnimationFrame( rafId );
+    rafId = requestAnimationFrame( () =>
+    {
       computeAndRenderResults();
       rafId = null;
-    });
-  });
+    } );
+  } );
 
-  applyBtn.addEventListener('click', computeAndRenderResults);
-  genderSel?.addEventListener('change', computeAndRenderResults);
-  maritalSel?.addEventListener('change', computeAndRenderResults);
-  childrenSel?.addEventListener('change', computeAndRenderResults);
-  spousesSel?.addEventListener('change', computeAndRenderResults);
+  applyBtn.addEventListener( 'click', computeAndRenderResults );
+  genderSel?.addEventListener( 'change', computeAndRenderResults );
+  maritalSel?.addEventListener( 'change', computeAndRenderResults );
+  childrenSel?.addEventListener( 'change', computeAndRenderResults );
+  spousesSel?.addEventListener( 'change', computeAndRenderResults );
 
-  if (clearBtn) {
-    clearBtn.addEventListener('click', () => {
-      if (genderSel) genderSel.value = '';
-      if (maritalSel) maritalSel.value = '';
-      if (childrenSel) childrenSel.value = '';
-      if (spousesSel) spousesSel.value = '';
-      if (input) input.value = '';
+  if ( clearBtn ) {
+    clearBtn.addEventListener( 'click', () =>
+    {
+      if ( genderSel ) genderSel.value = '';
+      if ( maritalSel ) maritalSel.value = '';
+      if ( childrenSel ) childrenSel.value = '';
+      if ( spousesSel ) spousesSel.value = '';
+      if ( input ) input.value = '';
       unifiedList.innerHTML = '';
-      const countEl = document.getElementById('resultsCount');
-      if (countEl) countEl.textContent = '';
-    });
+      const countEl = document.getElementById( 'resultsCount' );
+      if ( countEl ) countEl.textContent = '';
+    } );
   }
 
-  const clearSearchBtn = document.getElementById('clearSearchBtn');
-  if (clearSearchBtn) {
-    clearSearchBtn.addEventListener('click', () => {
-      if (input) input.value = '';
+  const clearSearchBtn = document.getElementById( 'clearSearchBtn' );
+  if ( clearSearchBtn ) {
+    clearSearchBtn.addEventListener( 'click', () =>
+    {
+      if ( input ) input.value = '';
       computeAndRenderResults();
-    });
+    } );
   }
 
-  if (backBtn) {
-    backBtn.addEventListener('click', () => {
+  if ( backBtn ) {
+    backBtn.addEventListener( 'click', () =>
+    {
       unifiedList.innerHTML = lastResultsHTML;
       backBtn.style.display = 'none';
-    });
+    } );
   }
 }
 
 // Expand sections along a path and scroll to the card
-async function navigateToPath(path) {
-  if (!path) return;
-  const backBtn = document.getElementById('backToResultsBtn');
-  if (backBtn) backBtn.style.display = 'inline-flex';
+async function navigateToPath ( path )
+{
+  if ( !path ) return;
+  const backBtn = document.getElementById( 'backToResultsBtn' );
+  if ( backBtn ) backBtn.style.display = 'inline-flex';
   // Expand required sections for the path by walking ancestor arrays
   const sectionPaths = [];
   let prefix = 'root';
   const regex = /(?:^|\.)((?:spouses|children))\[(\d+)\]/g;
   let m;
-  while ((m = regex.exec(path)) !== null) {
-    const type = m[1];
-    const index = m[2];
-    sectionPaths.push(`${prefix}.${type}`);
-    prefix = `${prefix}.${type}[${index}]`;
+  while ( ( m = regex.exec( path ) ) !== null ) {
+    const type = m[ 1 ];
+    const index = m[ 2 ];
+    sectionPaths.push( `${ prefix }.${ type }` );
+    prefix = `${ prefix }.${ type }[${ index }]`;
   }
   // Ensure sections expansion flags are set
-  sectionPaths.forEach(sp => { expandState[sp] = true; });
+  sectionPaths.forEach( sp => { expandState[ sp ] = true; } );
   // Re-render from root to realize expanded sections
   renderTree();
   // After render, if some sections were not expanded via flags, toggle them
-  for (const sp of sectionPaths) {
-    const id = `section-${sp.replace(/[\[\].]/g, '-')}`;
-    const el = document.getElementById(id);
-    if (el && el.classList.contains('collapsed')) {
-      toggleSection(sp);
+  for ( const sp of sectionPaths ) {
+    const id = `section-${ sp.replace( /[\[\].]/g, '-' ) }`;
+    const el = document.getElementById( id );
+    if ( el && el.classList.contains( 'collapsed' ) ) {
+      toggleSection( sp );
       // wait next frame so DOM updates before proceeding
-      await new Promise(r => requestAnimationFrame(r));
+      await new Promise( r => requestAnimationFrame( r ) );
     }
   }
   // Scroll to the member card and highlight
-  await new Promise(r => requestAnimationFrame(r));
-  const card = document.querySelector(`.member-card[data-path="${path}"]`);
-  if (card) {
-    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    card.classList.add('highlight');
-    card.addEventListener('animationend', () => {
-      card.classList.remove('highlight');
-    }, { once: true });
+  await new Promise( r => requestAnimationFrame( r ) );
+  const card = document.querySelector( `.member-card[data-path="${ path }"]` );
+  if ( card ) {
+    card.scrollIntoView( { behavior: 'smooth', block: 'center' } );
+    card.classList.add( 'highlight' );
+    card.addEventListener( 'animationend', () =>
+    {
+      card.classList.remove( 'highlight' );
+    }, { once: true } );
   }
 }
 
 // Render individual family member
-function renderMember(member, parent, path, level) {
-  const card = document.createElement('div');
-  card.className = 'member-card' + (member.gender == "Female" ? " female" : " male");
-  card.style.animationDelay = `${level * 0.1}s`;
-  card.setAttribute('data-path', path);
+function renderMember ( member, parent, path, level )
+{
+  const card = document.createElement( 'div' );
+  card.className = 'member-card' + ( member.gender == "Female" ? " female" : " male" );
+  card.style.animationDelay = `${ level * 0.1 }s`;
+  card.setAttribute( 'data-path', path );
 
   // Determine if member is deceased
-  const isDeceased = (member.dod && member.dod.trim() !== '') || (member.status && member.status.toLowerCase() === 'deceased');
+  const isDeceased = ( member.dod && member.dod.trim() !== '' ) || ( member.status && member.status.toLowerCase() === 'deceased' );
   const statusColor = isDeceased ? 'var(--text-muted)' : 'var(--success-color)';
 
   // Avatar HTML
   const avatarHTML = member.image
-    ? `<img src="${member.image}" alt="${member.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+    ? `<img src="${ member.image }" alt="${ member.name }" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
            <i class="fas fa-user" style="display: none;"></i>`
     : `<i class="fas fa-user"></i>`;
 
@@ -259,392 +278,413 @@ function renderMember(member, parent, path, level) {
     { icon: 'pray', label: 'Religion', value: member.religion || 'Not specified' }
   ];
 
-  if (formatDate(member.dob))
-    details.push({ icon: 'calendar-alt', label: 'Born', value: formatDate(member.dob) || 'Unknown' });
+  if ( formatDate( member.dob ) )
+    details.push( { icon: 'calendar-alt', label: 'Born', value: formatDate( member.dob ) || 'Unknown' } );
 
-  if (isDeceased && formatDate(member.dod)) {
-    details.push({ icon: 'cross', label: 'Died', value: formatDate(member.dod) });
+  if ( isDeceased && formatDate( member.dod ) ) {
+    details.push( { icon: 'cross', label: 'Died', value: formatDate( member.dod ) } );
   }
 
-  const detailsHTML = details.map(detail => `
-        <div class="detail-item" value="${detail.value}">
-          <i class="fas fa-${detail.icon}"></i>
-          <span>${detail.value}</span>
+  const detailsHTML = details.map( detail => `
+        <div class="detail-item" value="${ detail.value }">
+          <i class="fas fa-${ detail.icon }"></i>
+          <span>${ detail.value }</span>
         </div>
-      `).join('');
+      `).join( '' );
 
   // Main card content
   card.innerHTML = `
         <div class="card-header">
           <div class="avatar-container">
             <div class="avatar">
-              ${avatarHTML}
+              ${ avatarHTML }
             </div>
-            <div class="status-indicator" style="background: ${statusColor};"></div>
+            <div class="status-indicator" style="background: ${ statusColor };"></div>
           </div>
           <div class="member-info">
             <div class="member-name">
-              ${member.name ? `<span class="name">${member.name}</span>` : ''}
-              <span class="serial-badge">#${member.serial || 'N/A'}</span>
-              ${member.alternateName ? `<span class="alternate-name">(${member.alternateName})</span>` : ''}
+              ${ member.name ? `<span class="name">${ member.name }</span>` : '' }
+              <span class="serial-badge">#${ member.serial || 'N/A' }</span>
+              ${ member.alternateName ? `<span class="alternate-name">(${ member.alternateName })</span>` : '' }
             </div>
             <div class="member-details">
-              ${detailsHTML}
+              ${ detailsHTML }
             </div>
-            ${member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${member.notes}</div>` : ''}
+            ${ member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${ member.notes }</div>` : '' }
           </div>
         </div>
         <div class="card-actions">
-          <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${path}')">
+          <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${ path }')">
             <i class="fas fa-ring"></i> Add Spouse
           </button>
-          <button class="btn btn-primary btn-sm" onclick="showModal('child', '${path}')">
+          <button class="btn btn-primary btn-sm" onclick="showModal('child', '${ path }')">
             <i class="fas fa-baby"></i> Add Child
           </button>
-          <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${path}')">
+          <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${ path }')">
             <i class="fas fa-edit"></i> Edit
           </button>
-          ${path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${path}')"><i class="fas fa-trash"></i> Delete</button>` : ''}
+          ${ path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${ path }')"><i class="fas fa-trash"></i> Delete</button>` : '' }
         </div>
       `;
 
   // Add spouses section
-  if (member.spouses && member.spouses.length > 0) {
-    const spousesSection = createSection('spouses', path, member, 'Spouses', 'ring', level);
-    card.appendChild(spousesSection);
+  if ( member.spouses && member.spouses.length > 0 ) {
+    const spousesSection = createSection( 'spouses', path, member, 'Spouses', 'ring', level );
+    card.appendChild( spousesSection );
   }
 
   // Add children section
-  if (member.children && member.children.length > 0) {
-    const childrenSection = createSection('children', path, member, 'Children', 'users', level);
-    card.appendChild(childrenSection);
+  if ( member.children && member.children.length > 0 ) {
+    const childrenSection = createSection( 'children', path, member, 'Children', 'users', level );
+    card.appendChild( childrenSection );
   }
 
-  card.setAttribute("privacy", member.privacy || "public");
+  card.setAttribute( "privacy", member.privacy || "public" );
 
   return card;
 }
 
 // Create expandable section (spouses/children)
-function createSection(type, path, member, title, icon, level) {
-  const section = document.createElement('div');
+function createSection ( type, path, member, title, icon, level )
+{
+  const section = document.createElement( 'div' );
   section.className = 'tree-connections';
 
-  const sectionPath = `${path}.${type}`;
-  const isExp = isExpanded(sectionPath);
+  const sectionPath = `${ path }.${ type }`;
+  const isExp = isExpanded( sectionPath );
 
-  const sectionHeader = document.createElement('div');
+  const sectionHeader = document.createElement( 'div' );
   sectionHeader.className = 'section-header';
   sectionHeader.innerHTML = `
-        <button class="toggle-btn ${isExp ? 'expanded' : ''}" >
+        <button class="toggle-btn ${ isExp ? 'expanded' : '' }" >
           <i class="fas fa-chevron-right"></i>
         </button>
-        <i class="fas fa-${icon}"></i>
-        <span class="section-title" mValue="${member[type].length}">${title}</span>
+        <i class="fas fa-${ icon }"></i>
+        <span class="section-title" mValue="${ member[ type ].length }">${ title }</span>
       `;
 
-  sectionHeader.onclick = () => toggleSection(sectionPath);
+  sectionHeader.onclick = () => toggleSection( sectionPath );
 
-  const sectionContent = document.createElement('div');
-  sectionContent.className = `section-content ${isExp ? 'expanded' : 'collapsed'}`;
-  sectionContent.id = `section-${sectionPath.replace(/[\[\].]/g, '-')}`;
+  const sectionContent = document.createElement( 'div' );
+  sectionContent.className = `section-content ${ isExp ? 'expanded' : 'collapsed' }`;
+  sectionContent.id = `section-${ sectionPath.replace( /[\[\].]/g, '-' ) }`;
 
-  if (isExp) {
-    member[type].forEach((item, i) => {
-      const itemElement = renderMember(item, member, `${path}.${type}[${i}]`, level + 1);
-      sectionContent.appendChild(itemElement);
-    });
+  if ( isExp ) {
+    member[ type ].forEach( ( item, i ) =>
+    {
+      const itemElement = renderMember( item, member, `${ path }.${ type }[${ i }]`, level + 1 );
+      sectionContent.appendChild( itemElement );
+    } );
   }
 
-  section.appendChild(sectionHeader);
-  section.appendChild(sectionContent);
+  section.appendChild( sectionHeader );
+  section.appendChild( sectionContent );
 
   return section;
 }
 
 // Optimized toggle section function
-function toggleSection(sectionPath) {
-  const isCurrentlyExpanded = isExpanded(sectionPath);
-  expandState[sectionPath] = !isCurrentlyExpanded;
+function toggleSection ( sectionPath )
+{
+  const isCurrentlyExpanded = isExpanded( sectionPath );
+  expandState[ sectionPath ] = !isCurrentlyExpanded;
 
   // Find the specific section content
-  const sectionContentId = `section-${sectionPath.replace(/[\[\].]/g, '-')}`;
-  const sectionContent = document.getElementById(sectionContentId);
-  const toggleBtn = sectionContent.parentElement.querySelector('.toggle-btn');
+  const sectionContentId = `section-${ sectionPath.replace( /[\[\].]/g, '-' ) }`;
+  const sectionContent = document.getElementById( sectionContentId );
+  const toggleBtn = sectionContent.parentElement.querySelector( '.toggle-btn' );
   const treeConnections = toggleBtn.parentElement;
 
-  if (!isCurrentlyExpanded) {
+  if ( !isCurrentlyExpanded ) {
     // Expanding
-    toggleBtn.classList.add('expanded');
-    treeConnections.classList.add('expanded');
+    toggleBtn.classList.add( 'expanded' );
+    treeConnections.classList.add( 'expanded' );
     sectionContent.className = 'section-content expanded';
 
     // Get the data and render items
-    const pathParts = sectionPath.split('.');
-    const type = pathParts[pathParts.length - 1];
-    const memberPath = pathParts.slice(0, -1).join('.');
-    const member = getByPath(memberPath);
+    const pathParts = sectionPath.split( '.' );
+    const type = pathParts[ pathParts.length - 1 ];
+    const memberPath = pathParts.slice( 0, -1 ).join( '.' );
+    const member = getByPath( memberPath );
 
     // Clear and render items
     sectionContent.innerHTML = '';
-    if (member[type] && member[type].length > 0) {
+    if ( member[ type ] && member[ type ].length > 0 ) {
       const level = pathParts.length - 1;
-      member[type].forEach((item, i) => {
-        const itemElement = renderMember(item, member, `${memberPath}.${type}[${i}]`, level);
-        sectionContent.appendChild(itemElement);
-      });
+      member[ type ].forEach( ( item, i ) =>
+      {
+        const itemElement = renderMember( item, member, `${ memberPath }.${ type }[${ i }]`, level );
+        sectionContent.appendChild( itemElement );
+      } );
     }
   } else {
     // Collapsing
-    toggleBtn.classList.remove('expanded');
-    treeConnections.classList.remove('expanded');
+    toggleBtn.classList.remove( 'expanded' );
+    treeConnections.classList.remove( 'expanded' );
     sectionContent.className = 'section-content collapsed';
 
     // Clear content after transition ends
-    const onEnd = () => {
-      sectionContent.removeEventListener('transitionend', onEnd);
-      if (sectionContent.classList.contains('collapsed')) {
+    const onEnd = () =>
+    {
+      sectionContent.removeEventListener( 'transitionend', onEnd );
+      if ( sectionContent.classList.contains( 'collapsed' ) ) {
         sectionContent.innerHTML = '';
       }
     };
-    sectionContent.addEventListener('transitionend', onEnd);
+    sectionContent.addEventListener( 'transitionend', onEnd );
   }
 }
 
 // Check if section is expanded
-function isExpanded(path) {
-  return expandState[path] !== false; // Default to expanded
+function isExpanded ( path )
+{
+  return expandState[ path ] !== false; // Default to expanded
 }
 
 // Expand all sections
-function expandAll() {
+function expandAll ()
+{
   expandState = {};
   renderTree();
 }
 
-async function onDBClick() {
-  const code = await prompt("Enter your secret code to unlock controls");
-  if (+code == 7889) {
-    const role = await prompt("Enter your role to unlock controls");
-    if (["root", "admin", "writer", "reader"].includes(role)) {
-      localStorage.setItem("role", role);
-      document.querySelector(".container").setAttribute("role", role);
+async function onDBClick ()
+{
+  const code = await prompt( "Enter your secret code to unlock controls" );
+  if ( +code == 7889 ) {
+    const role = await prompt( "Enter your role to unlock controls" );
+    if ( [ "root", "admin", "writer", "reader" ].includes( role ) ) {
+      localStorage.setItem( "role", role );
+      document.querySelector( ".container" ).setAttribute( "role", role );
       return;
     }
   }
-  document.querySelector(".container").setAttribute("role", "reader");
+  document.querySelector( ".container" ).setAttribute( "role", "reader" );
 }
 
 // Collapse all sections
-function collapseAll() {
-  function setAllCollapsed(obj, currentPath) {
-    if (obj.spouses && obj.spouses.length > 0) {
-      expandState[currentPath + '.spouses'] = false;
-      obj.spouses.forEach((spouse, i) => {
-        setAllCollapsed(spouse, currentPath + `.spouses[${i}]`);
-      });
+function collapseAll ()
+{
+  function setAllCollapsed ( obj, currentPath )
+  {
+    if ( obj.spouses && obj.spouses.length > 0 ) {
+      expandState[ currentPath + '.spouses' ] = false;
+      obj.spouses.forEach( ( spouse, i ) =>
+      {
+        setAllCollapsed( spouse, currentPath + `.spouses[${ i }]` );
+      } );
     }
-    if (obj.children && obj.children.length > 0) {
-      expandState[currentPath + '.children'] = false;
-      obj.children.forEach((child, i) => {
-        setAllCollapsed(child, currentPath + `.children[${i}]`);
-      });
+    if ( obj.children && obj.children.length > 0 ) {
+      expandState[ currentPath + '.children' ] = false;
+      obj.children.forEach( ( child, i ) =>
+      {
+        setAllCollapsed( child, currentPath + `.children[${ i }]` );
+      } );
     }
   }
 
-  setAllCollapsed(data.rootPerson, 'root');
+  setAllCollapsed( data.rootPerson, 'root' );
   renderTree();
 }
 
 // Show modal for adding/editing members
-function showModal(type, path) {
-  const modal = document.getElementById('modal');
-  const form = document.getElementById('memberForm');
-  const title = document.getElementById('modalTitle');
-  const subtitle = document.getElementById('modalSubtitle');
+function showModal ( type, path )
+{
+  const modal = document.getElementById( 'modal' );
+  const form = document.getElementById( 'memberForm' );
+  const title = document.getElementById( 'modalTitle' );
+  const subtitle = document.getElementById( 'modalSubtitle' );
 
   // Reset form
   form.reset();
 
   let member = {};
-  if (type === 'edit') {
-    member = getByPath(path);
+  if ( type === 'edit' ) {
+    member = getByPath( path );
     title.textContent = 'Edit Family Member';
-    subtitle.textContent = `Update information for ${member.name}`;
+    subtitle.textContent = `Update information for ${ member.name }`;
 
     // Populate form with existing data
-    Object.keys(member).forEach(key => {
-      const input = form.querySelector(`[name="${key}"]`);
-      if (["gender", "privacy", "status", "maritalStatus"].includes(key))
-        form.querySelector(`[value="${member[key]}"]`).checked = true;
-      else if (input && member[key] !== null && member[key] !== undefined)
-        input.value = member[key];
-    });
+    Object.keys( member ).forEach( key =>
+    {
+      const input = form.querySelector( `[name="${ key }"]` );
+      if ( [ "gender", "privacy", "status", "maritalStatus" ].includes( key ) )
+        form.querySelector( `[value="${ member[ key ] }"]` ).checked = true;
+      else if ( input && member[ key ] !== null && member[ key ] !== undefined )
+        input.value = member[ key ];
+    } );
   } else {
     title.textContent = type === 'spouse' ? 'Add Spouse' : 'Add Child';
-    subtitle.textContent = `Add new ${type} to the family tree`;
+    subtitle.textContent = `Add new ${ type } to the family tree`;
   }
 
   // Store form context
   form.dataset.type = type;
   form.dataset.path = path;
 
-  modal.classList.add('show');
+  modal.classList.add( 'show' );
 }
 
 // Close modal
-function closeModal() {
-  document.getElementById('modal').classList.remove('show');
+function closeModal ()
+{
+  document.getElementById( 'modal' ).classList.remove( 'show' );
 }
 
 // Handle form submission
-document.getElementById('memberForm').addEventListener('submit', function (e) {
+document.getElementById( 'memberForm' ).addEventListener( 'submit', function ( e )
+{
   e.preventDefault();
 
-  const formData = new FormData(this);
+  const formData = new FormData( this );
   const memberData = {};
 
   // Convert form data to object
-  for (let [key, value] of formData.entries()) {
-    if (value.trim()) {
-      memberData[key] = value.trim();
+  for ( let [ key, value ] of formData.entries() ) {
+    if ( value.trim() ) {
+      memberData[ key ] = value.trim();
     }
   }
 
   const type = this.dataset.type;
   const path = this.dataset.path;
 
-  if (type === 'edit') {
+  if ( type === 'edit' ) {
     // Edit existing member
-    const member = getByPath(path);
-    Object.assign(member, memberData);
+    const member = getByPath( path );
+    Object.assign( member, memberData );
 
     // Re-render just this member card
-    const memberCard = document.querySelector(`[data-path="${path}"]`);
-    const newCard = renderMember(member, null, path, 0);
-    memberCard.parentNode.replaceChild(newCard, memberCard);
+    const memberCard = document.querySelector( `[data-path="${ path }"]` );
+    const newCard = renderMember( member, null, path, 0 );
+    memberCard.parentNode.replaceChild( newCard, memberCard );
 
   } else {
     // Add new member
-    memberData.serial = getNextSerial(data.rootPerson) + 1;
+    memberData.serial = getNextSerial( data.rootPerson ) + 1;
     memberData.spouses = [];
     memberData.children = [];
 
-    const parent = getByPath(path);
-    if (type === 'spouse') {
+    const parent = getByPath( path );
+    if ( type === 'spouse' ) {
       parent.spouses = parent.spouses || [];
-      parent.spouses.push(memberData);
+      parent.spouses.push( memberData );
 
       // Update the spouses section if it exists and is expanded
-      const spousesPath = `${path}.spouses`;
-      if (isExpanded(spousesPath)) {
-        const sectionContentId = `section-${spousesPath.replace(/[\[\].]/g, '-')}`;
-        const sectionContent = document.getElementById(sectionContentId);
-        if (sectionContent) {
+      const spousesPath = `${ path }.spouses`;
+      if ( isExpanded( spousesPath ) ) {
+        const sectionContentId = `section-${ spousesPath.replace( /[\[\].]/g, '-' ) }`;
+        const sectionContent = document.getElementById( sectionContentId );
+        if ( sectionContent ) {
           const newIndex = parent.spouses.length - 1;
-          const newSpouse = renderMember(memberData, parent, `${path}.spouses[${newIndex}]`, path.split('.').length);
-          sectionContent.appendChild(newSpouse);
+          const newSpouse = renderMember( memberData, parent, `${ path }.spouses[${ newIndex }]`, path.split( '.' ).length );
+          sectionContent.appendChild( newSpouse );
         }
       }
 
-    } else if (type === 'child') {
+    } else if ( type === 'child' ) {
       parent.children = parent.children || [];
-      parent.children.push(memberData);
+      parent.children.push( memberData );
 
       // Update the children section if it exists and is expanded
-      const childrenPath = `${path}.children`;
-      if (isExpanded(childrenPath)) {
-        const sectionContentId = `section-${childrenPath.replace(/[\[\].]/g, '-')}`;
-        const sectionContent = document.getElementById(sectionContentId);
-        if (sectionContent) {
+      const childrenPath = `${ path }.children`;
+      if ( isExpanded( childrenPath ) ) {
+        const sectionContentId = `section-${ childrenPath.replace( /[\[\].]/g, '-' ) }`;
+        const sectionContent = document.getElementById( sectionContentId );
+        if ( sectionContent ) {
           const newIndex = parent.children.length - 1;
-          const newChild = renderMember(memberData, parent, `${path}.children[${newIndex}]`, path.split('.').length);
-          sectionContent.appendChild(newChild);
+          const newChild = renderMember( memberData, parent, `${ path }.children[${ newIndex }]`, path.split( '.' ).length );
+          sectionContent.appendChild( newChild );
         }
       }
     }
 
     // Update section headers to reflect new counts
-    const parentCard = document.querySelector(`[data-path="${path}"]`);
-    if (parentCard) {
-      const sectionHeaders = parentCard.querySelectorAll('.section-title');
-      sectionHeaders.forEach(header => {
+    const parentCard = document.querySelector( `[data-path="${ path }"]` );
+    if ( parentCard ) {
+      const sectionHeaders = parentCard.querySelectorAll( '.section-title' );
+      sectionHeaders.forEach( header =>
+      {
         const text = header.textContent;
-        if (type === 'spouse' && text.includes('Spouses')) {
+        if ( type === 'spouse' && text.includes( 'Spouses' ) ) {
           header.textContent = `Spouses`;
-          header.setAttribute("mValue", parent.spouses.length);
-        } else if (type === 'child' && text.includes('Children')) {
-          header.textContent = `Children (${parent.children.length})`;
-          header.setAttribute("mValue", parent.children.length);
+          header.setAttribute( "mValue", parent.spouses.length );
+        } else if ( type === 'child' && text.includes( 'Children' ) ) {
+          header.textContent = `Children (${ parent.children.length })`;
+          header.setAttribute( "mValue", parent.children.length );
         }
-      });
+      } );
     }
   }
 
   closeModal();
   uploadDataToServer();
-});
+} );
 
 function uploadDataToServer ()
 {
-  if ( !data.date )
-    data.date = new Date().getTime();
-  const jsonStr = JSON.stringify(data, null, 2);
-  fetch(baseURL + 'family', {
+  data.date = new Date().getTime();
+  document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
+  const jsonStr = JSON.stringify( data, null, 2 );
+  fetch( baseURL + 'family', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
     body: jsonStr
-  }).then(response => {
-    if (response.ok) {
-      console.log('Family tree exported successfully!');
+  } ).then( response =>
+  {
+    if ( response.ok ) {
+      console.log( 'Family tree exported successfully!' );
     } else {
-      alert('Error exporting family tree: ' + response.statusText);
+      alert( 'Error exporting family tree: ' + response.statusText );
     }
-  }).catch(error => {
-    alert('Error exporting family tree: ' + error.message);
-  });
+  } ).catch( error =>
+  {
+    alert( 'Error exporting family tree: ' + error.message );
+  } );
 }
 
 // Delete member
-function deleteMember(path) {
-  if (!confirm('Are you sure you want to delete this member and all their descendants?')) {
+function deleteMember ( path )
+{
+  if ( !confirm( 'Are you sure you want to delete this member and all their descendants?' ) ) {
     return;
   }
 
-  const pathParts = path.split('.');
+  const pathParts = path.split( '.' );
   const lastPart = pathParts.pop();
-  const parentPath = pathParts.join('.');
-  const parent = getByPath(parentPath);
+  const parentPath = pathParts.join( '.' );
+  const parent = getByPath( parentPath );
 
-  const match = lastPart.match(/(\w+)\[(\d+)\]/);
-  if (match) {
-    const arrayName = match[1];
-    const index = parseInt(match[2]);
-    if (parent && parent[arrayName]) {
-      parent[arrayName].splice(index, 1);
+  const match = lastPart.match( /(\w+)\[(\d+)\]/ );
+  if ( match ) {
+    const arrayName = match[ 1 ];
+    const index = parseInt( match[ 2 ] );
+    if ( parent && parent[ arrayName ] ) {
+      parent[ arrayName ].splice( index, 1 );
 
       // Remove the member card from DOM
-      const memberCard = document.querySelector(`[data-path="${path}"]`);
-      if (memberCard) {
+      const memberCard = document.querySelector( `[data-path="${ path }"]` );
+      if ( memberCard ) {
         memberCard.remove();
       }
 
       // Update section header counts
-      const parentCard = document.querySelector(`[data-path="${parentPath}"]`);
-      if (parentCard) {
-        const sectionHeaders = parentCard.querySelectorAll('.section-title');
-        sectionHeaders.forEach(header => {
+      const parentCard = document.querySelector( `[data-path="${ parentPath }"]` );
+      if ( parentCard ) {
+        const sectionHeaders = parentCard.querySelectorAll( '.section-title' );
+        sectionHeaders.forEach( header =>
+        {
           const text = header.textContent;
-          if (arrayName === 'spouses' && text.includes('Spouses')) {
+          if ( arrayName === 'spouses' && text.includes( 'Spouses' ) ) {
             header.textContent = `Spouses`;
-            header.setAttribute("value", parent.spouses.length);
-          } else if (arrayName === 'children' && text.includes('Children')) {
+            header.setAttribute( "value", parent.spouses.length );
+          } else if ( arrayName === 'children' && text.includes( 'Children' ) ) {
             header.textContent = `Children`;
-            header.setAttribute("value", parent.children.length);
+            header.setAttribute( "value", parent.children.length );
           }
-        });
+        } );
       }
     }
   }
@@ -653,122 +693,133 @@ function deleteMember(path) {
 }
 
 // Get member by path
-function getByPath(path) {
-  if (path === 'root') return data.rootPerson;
+function getByPath ( path )
+{
+  if ( path === 'root' ) return data.rootPerson;
 
   let obj = data.rootPerson;
   const regex = /(\w+)\[(\d+)\]/g;
   let match;
 
-  while ((match = regex.exec(path)) !== null) {
-    const arrayName = match[1];
-    const index = parseInt(match[2]);
-    obj = obj[arrayName][index];
+  while ( ( match = regex.exec( path ) ) !== null ) {
+    const arrayName = match[ 1 ];
+    const index = parseInt( match[ 2 ] );
+    obj = obj[ arrayName ][ index ];
   }
 
   return obj;
 }
 
 // Get next serial number
-function getNextSerial(obj, max = 0) {
-  if (!obj) return max;
+function getNextSerial ( obj, max = 0 )
+{
+  if ( !obj ) return max;
 
-  if (obj.serial && obj.serial > max) {
+  if ( obj.serial && obj.serial > max ) {
     max = obj.serial;
   }
 
-  if (obj.spouses) {
-    obj.spouses.forEach(spouse => {
-      if (spouse.serial && spouse.serial > max) {
+  if ( obj.spouses ) {
+    obj.spouses.forEach( spouse =>
+    {
+      if ( spouse.serial && spouse.serial > max ) {
         max = spouse.serial;
       }
-      if (spouse.children) {
-        spouse.children.forEach(child => {
-          max = getNextSerial(child, max);
-        });
+      if ( spouse.children ) {
+        spouse.children.forEach( child =>
+        {
+          max = getNextSerial( child, max );
+        } );
       }
-    });
+    } );
   }
 
-  if (obj.children) {
-    obj.children.forEach(child => {
-      max = getNextSerial(child, max);
-    });
+  if ( obj.children ) {
+    obj.children.forEach( child =>
+    {
+      max = getNextSerial( child, max );
+    } );
   }
 
   return max;
 }
 
 // Format date for display
-function formatDate(dateString) {
-  if (!dateString || dateString.trim() === '') return null;
+function formatDate ( dateString )
+{
+  if ( !dateString || dateString.trim() === '' ) return null;
 
   try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
+    const date = new Date( dateString );
+    return date.toLocaleDateString( 'en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
-    });
-  } catch (e) {
+    } );
+  } catch ( e ) {
     return dateString; // Return original if parsing fails
   }
 }
 
 // Export JSON
-async function exportJSON() {
-  if (!data) {
-    alert('No data to export');
+async function exportJSON ()
+{
+  if ( !data ) {
+    alert( 'No data to export' );
     return;
   }
 
-  const jsonStr = JSON.stringify(data, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
+  const jsonStr = JSON.stringify( data, null, 2 );
+  const blob = new Blob( [ jsonStr ], { type: 'application/json' } );
+  const url = URL.createObjectURL( blob );
 
-  const a = document.createElement('a');
+  const a = document.createElement( 'a' );
   a.href = url;
-  a.download = `${data.familyName || 'family_tree'}.json`;
-  document.body.appendChild(a);
+  a.download = `${ data.familyName || 'family_tree' }.json`;
+  document.body.appendChild( a );
   a.click();
 
-  setTimeout(() => {
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, 100);
+  setTimeout( () =>
+  {
+    document.body.removeChild( a );
+    URL.revokeObjectURL( url );
+  }, 100 );
 }
 
 // Import JSON
-function importJSON(event) {
-  const file = event.target.files[0];
-  if (!file) return;
+function importJSON ( event )
+{
+  const file = event.target.files[ 0 ];
+  if ( !file ) return;
 
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = function ( e )
+  {
     try {
-      const imported = JSON.parse(e.target.result);
-      if (imported.familyName && imported.rootPerson) {
+      const imported = JSON.parse( e.target.result );
+      if ( imported.familyName && imported.rootPerson ) {
         data = imported;
         expandState = {}; // Reset expansion state
         collapseAll();
         uploadDataToServer();
-        console.log('Family tree imported successfully!');
+        console.log( 'Family tree imported successfully!' );
       } else {
-        alert('Invalid family tree JSON structure.');
+        alert( 'Invalid family tree JSON structure.' );
       }
-    } catch (err) {
-      alert('Error parsing JSON: ' + err.message);
+    } catch ( err ) {
+      alert( 'Error parsing JSON: ' + err.message );
     }
   };
-  reader.readAsText(file);
+  reader.readAsText( file );
 
   // Reset file input
   event.target.value = '';
 }
 
 // Close modal when clicking overlay
-document.getElementById('modal').addEventListener('click', function (e) {
-  if (e.target === this) {
+document.getElementById( 'modal' ).addEventListener( 'click', function ( e )
+{
+  if ( e.target === this ) {
     closeModal();
   }
 } );
@@ -776,22 +827,80 @@ document.getElementById('modal').addEventListener('click', function (e) {
 
 function storeJsonLocally ( data )
 {
-  localStorage.setItem('familyTreeData', JSON.stringify(data));
+  localStorage.setItem( 'familyTreeData', JSON.stringify( data ) );
 }
 
 function retrieveJsonLocally ()
 {
   const data = localStorage.getItem( 'familyTreeData' );
-  if (!data) return null;
-  return JSON.parse(data);
+  if ( !data ) return null;
+  return JSON.parse( data );
 }
 
 function isUpdateRequired ( data )
 {
   const storedData = retrieveJsonLocally();
-  if (!storedData) return true;
-  if (!storedData.date) return true;
+  if ( !storedData ) return true;
+  if ( !storedData.date ) return true;
   return storedData.date !== data.date;
+}
+
+function GetDisplayTime ( timeSent, includeSeconds = false , Is24Hour = false )
+{
+  if ( timeSent <= 0 )
+    return "--";
+
+  // Time received/sent
+  let dateTimeSent = new Date( timeSent );
+  let date = dateTimeSent.getDate();
+  let month = dateTimeSent.getMonth();
+  let day = dateTimeSent.getDay();
+  let dayPart = ["Sun","Mon", "Tue", "Wed", "Thur", "Fri", "Sat"][ day ]; // https://stackoverflow.com/q/54741141/514235
+  let fullYear = dateTimeSent.getFullYear();
+
+  let hours = dateTimeSent.getHours();
+  let hour = hours % 12;
+  hour = Is24Hour ? hour ? hour : 12 : hours;
+  let am_pm = Is24Hour ? hours >= 12 ? "pm" : "am" : "";
+  let minutes = dateTimeSent.getMinutes();
+  let seconds = dateTimeSent.getSeconds();
+  let actualTime = ( "00" + hour ).slice( -2 ) + ":" + ( "00" + minutes ).slice( -2 );
+  if ( includeSeconds ) {
+    actualTime += ":" + ( "00" + seconds ).slice( -2 );
+  }
+  let timePart = Is24Hour ? actualTime + " " + am_pm : actualTime;
+
+  const monthNames = [ "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" ];
+  let monthName = monthNames[ month ];
+  let dayMonthPart = ( "00" + date ).slice( -2 ) + "-" + monthName;
+
+  // Today's date
+  let today = new Date();
+  let todayFullYear = today.getFullYear();
+  let todayMonth = today.getMonth();
+  let todayDate = today.getDate();
+  let todayDay = today.getDay();
+  let time = ( date > todayDate ) ? date - todayDate : todayDate - date;
+
+  if ( fullYear == todayFullYear && month == todayMonth && date == todayDate )
+    return timePart;
+
+  if ( fullYear == todayFullYear && month == todayMonth && todayDate - date == 1 )
+    return "Y'day" + ", " + timePart;
+
+  if ( fullYear == todayFullYear && month == todayMonth && day != todayDay && time <= 7 )
+    return dayMonthPart + ", " + dayPart + ", " + timePart;
+
+  // To check if it's same day/date
+  if ( fullYear == todayFullYear && month == todayMonth && date == todayDate )
+    return timePart;
+
+  if ( fullYear == todayFullYear )
+    return dayMonthPart + ", " + timePart;
+
+  dayMonthPart += "-" + fullYear; // Append the year if it's not the same as the current year
+
+  return dayMonthPart + ", " + timePart;
 }
 
 // Global function assignments
