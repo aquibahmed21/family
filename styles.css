@@ -278,6 +278,7 @@ body {
   background: transparent;
   color: var(--text-primary);
   border: 2px solid var(--border-color);
+  padding: 0.35rem 0.5rem;
 }
 
 .btn-outline:hover {
@@ -296,24 +297,17 @@ body {
 }
 
 #lastUpdated {
-  position: fixed;
-  top: 0.75rem;
-  right: 2.75rem;
-  color: var(--text-muted);
   font-size: 0.85rem;
   z-index: 3;
   padding: 0.5rem;
   border-radius: 4px;
-  color: #f7fafc;
+  color: #7555ab;
+  display: block;
+  text-align: right;
 }
 
 #lastUpdated::before {
   content: "last updated: ";
-  position: absolute;
-  top: -10px;
-  left: -6px;
-  width: 100%;
-  height: 100%;
   z-index: 0;
   border-radius: 4px;
   opacity: 0.8;
