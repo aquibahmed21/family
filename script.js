@@ -589,8 +589,6 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
   const type = this.dataset.type;
   const path = this.dataset.path;
 
-  closeModal();
-
   if (type === 'edit')
   {
     // Edit existing member
@@ -686,7 +684,6 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
 
 function uploadDataToServer()
 {
-  return;
   data.date = new Date().getTime();
   document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
   const jsonStr = JSON.stringify(data, null, 2);
