@@ -501,6 +501,7 @@ function collapseAll()
 {
   function setAllCollapsed(obj, currentPath)
   {
+    if (!obj) return;
     if (obj.spouses && obj.spouses.length > 0)
     {
       expandState[currentPath + '.spouses'] = false;
