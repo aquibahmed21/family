@@ -30,13 +30,21 @@ function loadFamilyTree()
     .then(response => response.json())
     .then(json =>
     {
-      if (isUpdateRequired(json))
+      if (isUpdateRequired(json) || (!data && json))
       {
         data = json;
         storeJsonLocally(data);
         document.getElementById('loadingState').style.display = 'none';
         document.getElementById('treeContent').style.display = 'block';
         collapseAll();
+        document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
+      }
+      else
+      {
+        document.getElementById('loadingState').innerHTML = `
+            <i class="fas fa-exclamation-triangle" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+            Failed to load family tree: data not available
+          `;
       }
     })
     .catch(err =>
@@ -57,6 +65,8 @@ function renderTree()
   const container = document.getElementById('treeContent');
   container.innerHTML = '';
   container.appendChild(renderMember(data.rootPerson, null, 'root', 0));
+
+  document.querySelector("#totalMembers").textContent = `${collectMembers().length}`;
 }
 
 // Build a flat list of all members with their paths
@@ -213,6 +223,7 @@ function setupSearchAndFilters()
     backBtn.addEventListener('click', () =>
     {
       unifiedList.innerHTML = lastResultsHTML;
+      unifiedList.scrollIntoViewIfNeeded();
       backBtn.style.display = 'none';
     });
   }
@@ -578,6 +589,8 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
   const type = this.dataset.type;
   const path = this.dataset.path;
 
+  closeModal();
+
   if (type === 'edit')
   {
     // Edit existing member
@@ -614,9 +627,14 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
           const newSpouse = renderMember(memberData, parent, `${path}.spouses[${newIndex}]`, path.split('.').length);
           sectionContent.appendChild(newSpouse);
         }
+        else
+        {
+          const spousesSection = createSection('spouses', spousesPath, parent, 'Spouses', 'users', path.split('.').length);
+          document.querySelector(`.member-card[data-path="${path}"]`).appendChild(spousesSection);
+        }
       }
-
-    } else if (type === 'child')
+    }
+    else if (type === 'child')
     {
       parent.children = parent.children || [];
       parent.children.push(memberData);
@@ -632,6 +650,11 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
           const newIndex = parent.children.length - 1;
           const newChild = renderMember(memberData, parent, `${path}.children[${newIndex}]`, path.split('.').length);
           sectionContent.appendChild(newChild);
+        }
+        else
+        {
+          const childrenSection = createSection('children', childrenPath, parent, 'Children', 'users', path.split('.').length);
+          document.querySelector(`.member-card[data-path="${path}"]`).appendChild(childrenSection);
         }
       }
     }
@@ -650,7 +673,7 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
           header.setAttribute("mValue", parent.spouses.length);
         } else if (type === 'child' && text.includes('Children'))
         {
-          header.textContent = `Children (${parent.children.length})`;
+          header.textContent = `Children`;
           header.setAttribute("mValue", parent.children.length);
         }
       });
@@ -663,6 +686,7 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
 
 function uploadDataToServer()
 {
+  return;
   data.date = new Date().getTime();
   document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
   const jsonStr = JSON.stringify(data, null, 2);

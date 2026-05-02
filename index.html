@@ -24,29 +24,11 @@
 
   <!-- Main Container -->
   <div class="container">
-    <!-- Toolbar -->
-    <div class="toolbar">
-      <button class="btn btn-outline" onclick="exportJSON()">
-        <i class="fas fa-download"></i>
-        Export JSON
-      </button>
-      <label class="btn btn-outline" style="cursor: pointer;">
-        <i class="fas fa-upload"></i>
-        Import JSON
-        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importJSON(event)">
-      </label>
-      <button class="btn btn-outline" onclick="expandAll()">
-        <i class="fas fa-expand-arrows-alt"></i>
-        Expand All
-      </button>
-      <button class="btn btn-outline" onclick="collapseAll()">
-        <i class="fas fa-compress-arrows-alt"></i>
-        Collapse All
-      </button>
-    </div>
+
 
     <!-- Filters Panel -->
     <div class="filter-panel">
+
       <div class="filters">
         <div class="search-box" style="min-width:280px;">
           <i class="fas fa-search"></i>
@@ -96,6 +78,27 @@
       </div>
       <div class="results-header"><span id="resultsCount"></span></div>
       <div id="filterResults" class="results-list"></div>
+
+          <!-- Toolbar -->
+    <div class="toolbar">
+      <button class="btn btn-outline" onclick="exportJSON()">
+        <i class="fas fa-download"></i>
+        Export JSON
+      </button>
+      <label class="btn btn-outline" style="cursor: pointer;">
+        <i class="fas fa-upload"></i>
+        Import JSON
+        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importJSON(event)">
+      </label>
+      <button class="btn btn-outline" onclick="expandAll()">
+        <i class="fas fa-expand-arrows-alt"></i>
+        Expand All
+      </button>
+      <button class="btn btn-outline" onclick="collapseAll()">
+        <i class="fas fa-compress-arrows-alt"></i>
+        Collapse All
+      </button>
+    </div>
     </div>
 
     <!-- Tree Container -->
@@ -107,7 +110,10 @@
       <div id="treeContent" class="tree" style="display: none;"></div>
     </div>
   </div>
-  <span id="lastUpdated"></span>
+  <footer>
+    <span id="totalMembers" class="lastUpdated"></span>
+    <span id="lastUpdated" class="lastUpdated"></span>
+  </footer>
 
   <!-- Modal -->
   <div id="modal" class="modal">
