@@ -17,5 +17,8 @@ export default defineConfig({
   server: {
     open: true
   },
-  base: "/family"
+  base: "/family",
+  build: {
+    minify: false
+  }
 });
