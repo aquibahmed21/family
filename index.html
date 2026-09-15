@@ -5,8 +5,11 @@
   <meta charset="UTF-8">
   <title>Sathgadi Chandamiya Family</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#204d3f">
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Stylesheet -->
@@ -17,25 +20,99 @@
   <!-- Header -->
   <header class="header">
     <div class="header-content">
-      <h1 id="familyName">Family Tree</h1>
-      <p ondblclick="onDBClick()">Discover your heritage, preserve your legacy</p>
+      <div class="brand">
+        <span class="brand-icon"><i class="fas fa-tree"></i></span>
+        <div class="brand-text">
+          <h1 id="familyName">Family Tree</h1>
+          <p class="tagline" ondblclick="onDBClick()">Discover your heritage, preserve your legacy</p>
+        </div>
+      </div>
+      <div class="header-stats">
+        <span class="stat-pill"><i class="fas fa-users"></i><span id="totalMembers" class="lastUpdated"></span></span>
+        <span class="stat-pill"><i class="fas fa-clock"></i><span id="lastUpdated" class="lastUpdated"></span></span>
+      </div>
     </div>
   </header>
 
   <!-- Main Container -->
   <div class="container">
 
+    <!-- Demographics -->
+    <div class="stats-panel" id="statsPanel">
+      <div class="stat-block" tabindex="0" role="button" data-filter-type="gender" data-filter-value="Male" title="Show all male members">
+        <span class="stat-value" id="statMale">0</span>
+        <span class="stat-label"><i class="fas fa-mars"></i> Male</span>
+      </div>
+      <div class="stat-block" tabindex="0" role="button" data-filter-type="gender" data-filter-value="Female" title="Show all female members">
+        <span class="stat-value" id="statFemale">0</span>
+        <span class="stat-label"><i class="fas fa-venus"></i> Female</span>
+      </div>
+      <span class="stat-divider"></span>
+      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Married" title="Show all married members">
+        <span class="stat-value" id="statMarried">0</span>
+        <span class="stat-label">Married</span>
+      </div>
+      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Single" title="Show all single members">
+        <span class="stat-value" id="statSingle">0</span>
+        <span class="stat-label">Single</span>
+      </div>
+      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Widowed" title="Show all widowed members">
+        <span class="stat-value" id="statWidowed">0</span>
+        <span class="stat-label">Widowed</span>
+      </div>
+      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Divorced" title="Show all divorced members">
+        <span class="stat-value" id="statDivorced">0</span>
+        <span class="stat-label">Divorced</span>
+      </div>
+      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Separated" title="Show all separated members">
+        <span class="stat-value" id="statSeparated">0</span>
+        <span class="stat-label">Separated</span>
+      </div>
+    </div>
 
-    <!-- Filters Panel -->
+    <!-- View switcher: always available, independent of search/filter access -->
+    <div class="view-toggle" role="tablist" aria-label="Tree views">
+      <button class="icon-btn view-btn active" type="button" data-view="tree" onclick="setView('tree')" title="Tree view" aria-label="Tree view" aria-pressed="true">
+        <i class="fas fa-sitemap"></i> <span class="btn-label">Tree</span>
+      </button>
+      <button class="icon-btn view-btn" type="button" data-view="list" onclick="setView('list')" title="List view" aria-label="List view" aria-pressed="false">
+        <i class="fas fa-list-ul"></i> <span class="btn-label">List</span>
+      </button>
+      <button class="icon-btn view-btn" type="button" data-view="diagram" onclick="setView('diagram')" title="Diagram view" aria-label="Diagram view" aria-pressed="false">
+        <i class="fas fa-share-nodes"></i> <span class="btn-label">Diagram</span>
+      </button>
+    </div>
+
+    <!-- Search / Filters / Toolbar -->
     <div class="filter-panel">
 
-      <div class="filters">
-        <div class="search-box" style="min-width:280px;">
+      <div class="control-row">
+        <div class="search-box">
           <i class="fas fa-search"></i>
           <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
           <button id="clearSearchBtn" class="clear-input" type="button" title="Clear search"><i
               class="fas fa-times"></i></button>
         </div>
+
+        <div class="toolbar" role="toolbar" aria-label="Tree actions">
+          <button class="icon-btn" type="button" onclick="expandAll()" title="Expand All" aria-label="Expand All">
+            <i class="fas fa-expand-arrows-alt"></i>
+          </button>
+          <button class="icon-btn" type="button" onclick="collapseAll()" title="Collapse All" aria-label="Collapse All">
+            <i class="fas fa-compress-arrows-alt"></i>
+          </button>
+          <span class="toolbar-divider"></span>
+          <button class="icon-btn" type="button" onclick="exportJSON()" title="Export JSON" aria-label="Export JSON">
+            <i class="fas fa-download"></i>
+          </button>
+          <label class="icon-btn" title="Import JSON" aria-label="Import JSON">
+            <i class="fas fa-upload"></i>
+            <input type="file" id="importFile" accept=".json" hidden onchange="importJSON(event)">
+          </label>
+        </div>
+      </div>
+
+      <div class="filters">
         <div class="filter-item">
           <label>Gender</label>
           <select id="filterGender">
@@ -78,27 +155,6 @@
       </div>
       <div class="results-header"><span id="resultsCount"></span></div>
       <div id="filterResults" class="results-list"></div>
-
-          <!-- Toolbar -->
-    <div class="toolbar">
-      <button class="btn btn-outline" onclick="exportJSON()">
-        <i class="fas fa-download"></i>
-        Export JSON
-      </button>
-      <label class="btn btn-outline" style="cursor: pointer;">
-        <i class="fas fa-upload"></i>
-        Import JSON
-        <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importJSON(event)">
-      </label>
-      <button class="btn btn-outline" onclick="expandAll()">
-        <i class="fas fa-expand-arrows-alt"></i>
-        Expand All
-      </button>
-      <button class="btn btn-outline" onclick="collapseAll()">
-        <i class="fas fa-compress-arrows-alt"></i>
-        Collapse All
-      </button>
-    </div>
     </div>
 
     <!-- Tree Container -->
@@ -108,12 +164,10 @@
         Loading family tree...
       </div>
       <div id="treeContent" class="tree" style="display: none;"></div>
+      <div id="listContent" class="list-view" style="display: none;"></div>
+      <div id="diagramContent" class="diagram-view" style="display: none;"></div>
     </div>
   </div>
-  <footer>
-    <span id="totalMembers" class="lastUpdated"></span>
-    <span id="lastUpdated" class="lastUpdated"></span>
-  </footer>
 
   <!-- Modal -->
   <div id="modal" class="modal">
@@ -124,6 +178,8 @@
       </div>
       <div class="modal-body">
         <form id="memberForm">
+
+          <h3 class="form-section-title">Basic Information</h3>
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">Full Name *</label>
@@ -136,17 +192,32 @@
             </div>
           </div>
 
+          <div class="form-group">
+            <label class="form-label">Gender *</label>
+            <div class="form-control radio-group">
+              <label gender="Male">
+                <input type="radio" name="gender" value="Male" checked>
+                <span>Male</span>
+              </label>
+              <label gender="Female">
+                <input type="radio" name="gender" value="Female">
+                <span>Female</span>
+              </label>
+            </div>
+          </div>
+
+          <h3 class="form-section-title">Status</h3>
           <div class="form-grid">
             <div class="form-group">
-              <label class="form-label">Gender *</label>
+              <label class="form-label">Life Status</label>
               <div class="form-control radio-group">
-                <label gender="Male">
-                  <input type="radio" name="gender" value="Male" checked>
-                  <span>Male</span>
+                <label status="alive">
+                  <input type="radio" name="status" value="alive" checked>
+                  <span>Alive</span>
                 </label>
-                <label gender="Female">
-                  <input type="radio" name="gender" value="Female">
-                  <span>Female</span>
+                <label status="deceased">
+                  <input type="radio" name="status" value="deceased">
+                  <span>Deceased</span>
                 </label>
               </div>
             </div>
@@ -168,48 +239,35 @@
                 </label>
               </div>
             </div>
+          </div>
 
-            <div class="form-group">
-              <label class="form-label">Status</label>
-              <div class="form-control radio-group">
-                <label status="alive">
-                  <input type="radio" name="status" value="alive" checked>
-                  <span>Alive</span>
-                </label>
-                <label status="deceased">
-                  <input type="radio" name="status" value="deceased">
-                  <span>Deceased</span>
-                </label>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Martial Status</label>
-              <div class="form-control radio-group">
-                <label>
-                  <input type="radio" name="maritalStatus" value="Single">
-                  <span>Single</span>
-                </label>
-                <label>
-                  <input type="radio" name="maritalStatus" value="Married" checked>
-                  <span>Married</span>
-                </label>
-                <label>
-                  <input type="radio" name="maritalStatus" value="Divorced">
-                  <span>Divorced</span>
-                </label>
-                <label>
-                  <input type="radio" name="maritalStatus" value="Widowed">
-                  <span>Widowed</span>
-                </label>
-                <label>
-                  <input type="radio" name="maritalStatus" value="Separated">
-                  <span>Separated</span>
-                </label>
-              </div>
+          <div class="form-group">
+            <label class="form-label">Marital Status</label>
+            <div class="form-control radio-group">
+              <label>
+                <input type="radio" name="maritalStatus" value="Single">
+                <span>Single</span>
+              </label>
+              <label>
+                <input type="radio" name="maritalStatus" value="Married" checked>
+                <span>Married</span>
+              </label>
+              <label>
+                <input type="radio" name="maritalStatus" value="Divorced">
+                <span>Divorced</span>
+              </label>
+              <label>
+                <input type="radio" name="maritalStatus" value="Widowed">
+                <span>Widowed</span>
+              </label>
+              <label>
+                <input type="radio" name="maritalStatus" value="Separated">
+                <span>Separated</span>
+              </label>
             </div>
           </div>
 
+          <h3 class="form-section-title">Life Events</h3>
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">Date of Birth</label>
@@ -222,6 +280,7 @@
             </div>
           </div>
 
+          <h3 class="form-section-title">Additional Details</h3>
           <div class="form-grid">
             <div class="form-group">
               <label class="form-label">Religion</label>
@@ -232,6 +291,24 @@
               <label class="form-label">Profile Image URL</label>
               <input type="url" name="image" class="form-control" placeholder="https://example.com/image.jpg">
             </div>
+          </div>
+
+          <h3 class="form-section-title">Contact Information</h3>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Phone</label>
+              <input type="tel" name="phone" class="form-control" placeholder="Enter phone number">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" placeholder="Enter email address">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="addressLabel">Address</label>
+            <textarea name="address" id="addressInput" class="form-control" rows="2" placeholder="Enter home address"></textarea>
           </div>
 
           <div class="form-group">

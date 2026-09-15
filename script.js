@@ -1,6 +1,7 @@
 // Global variables
 let data = null;
 let expandState = {};
+let currentView = localStorage.getItem('view') || 'tree';
 const baseURL = 'https://web-push-3zaz.onrender.com/';
 
 // Initialize the application
@@ -8,12 +9,184 @@ document.addEventListener('DOMContentLoaded', function ()
 {
   const role = localStorage.getItem("role") || "reader";
   document.querySelector(".container").setAttribute("role", role);
+  document.querySelector(".container").setAttribute("data-view", currentView);
 
   loadFamilyTree();
 
   // Wire up search and filters once DOM is ready
   setupSearchAndFilters();
 });
+
+function getCurrentRole()
+{
+  return document.querySelector('.container')?.getAttribute('role') || 'reader';
+}
+
+// Switch between tree / compact / list views
+function setView(view)
+{
+  currentView = view;
+  localStorage.setItem('view', view);
+  document.querySelector('.container').setAttribute('data-view', view);
+
+  document.querySelectorAll('.view-btn').forEach(btn =>
+  {
+    const active = btn.dataset.view === view;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+  });
+
+  if (data)
+  {
+    applyViewVisibility();
+    if (view === 'tree') renderTree();
+  }
+}
+
+// Show the correct content pane for the current view
+function applyViewVisibility()
+{
+  const treeContent = document.getElementById('treeContent');
+  const listContent = document.getElementById('listContent');
+  const diagramContent = document.getElementById('diagramContent');
+
+  if (treeContent) treeContent.style.display = currentView === 'tree' ? 'block' : 'none';
+  if (listContent) listContent.style.display = currentView === 'list' ? 'flex' : 'none';
+  if (diagramContent) diagramContent.style.display = currentView === 'diagram' ? 'block' : 'none';
+
+  if (currentView === 'list') renderListView();
+  else if (currentView === 'diagram') renderDiagramView();
+}
+
+// Render the flat, indented list view of every member
+function renderListView()
+{
+  const listEl = document.getElementById('listContent');
+  if (!listEl) return;
+
+  const role = getCurrentRole();
+  const members = collectMembers().filter(m =>
+  {
+    if ((role === 'reader' || role === 'writer') && (m.privacy === 'private' || m.privacy === 'protected')) return false;
+    if (role === 'admin' && m.privacy === 'private') return false;
+    return true;
+  });
+
+  const head = `
+    <div class="list-row list-head">
+      <span>#</span><span>Name</span><span>Gender</span><span>Marital</span><span>Spouses</span><span>Children</span>
+    </div>`;
+
+  const rows = members.map(m =>
+  {
+    const depth = (m.path.match(/\[/g) || []).length;
+    const displayName = role === 'reader' ? 'Private' : (m.name || 'Unnamed');
+    const marital = role === 'reader' ? '—' : (m.maritalStatus || '—');
+    return `<div class="list-row${m.gender === 'Female' ? ' female' : ''}" data-path="${m.path}" style="--depth:${depth}">
+      <span class="list-serial">#${m.serial ?? 'N/A'}</span>
+      <span class="list-name"><span class="list-indent"></span><span class="gender-dot"></span>${displayName}</span>
+      <span>${m.gender || '—'}</span>
+      <span>${marital}</span>
+      <span>${m.spousesCount}</span>
+      <span>${m.childrenCount}</span>
+    </div>`;
+  }).join('');
+
+  listEl.innerHTML = head + rows;
+
+  listEl.onclick = (e) =>
+  {
+    const row = e.target.closest('.list-row');
+    if (!row || row.classList.contains('list-head')) return;
+    setView('tree');
+    navigateToPath(row.getAttribute('data-path'));
+  };
+}
+
+// Render the org-chart style diagram view (pure CSS/HTML, no libraries)
+function renderDiagramView()
+{
+  const el = document.getElementById('diagramContent');
+  if (!el || !data || !data.rootPerson) return;
+
+  el.innerHTML = `<ul class="chart-tree">${renderDiagramPerson(data.rootPerson, 'root')}</ul>`;
+
+  el.onclick = (e) =>
+  {
+    const groupNode = e.target.closest('.chart-group');
+    if (groupNode)
+    {
+      toggleDiagramSection(groupNode.dataset.toggle);
+      return;
+    }
+    const personNode = e.target.closest('.chart-person');
+    if (personNode)
+    {
+      const path = personNode.dataset.path;
+      setView('tree');
+      navigateToPath(path);
+    }
+  };
+}
+
+// Expand/collapse a spouses or children branch within the diagram view
+function toggleDiagramSection(sectionPath)
+{
+  expandState[sectionPath] = !isExpanded(sectionPath);
+  renderDiagramView();
+}
+
+// Build the <li> for one person plus their (possibly collapsed) branches
+function renderDiagramPerson(member, path)
+{
+  const role = getCurrentRole();
+  if ((role === 'reader' || role === 'writer') && (member.privacy === 'private' || member.privacy === 'protected')) return '';
+  if (role === 'admin' && member.privacy === 'private') return '';
+
+  const displayName = role === 'reader' ? 'Private' : (member.name || 'Unnamed');
+  const genderClass = member.gender === 'Female' ? 'female' : 'male';
+
+  const branches = [];
+
+  if (member.spouses && member.spouses.length > 0)
+  {
+    const groupPath = `${path}.spouses`;
+    const exp = isExpanded(groupPath);
+    const inner = exp ? member.spouses.map((sp, i) => renderDiagramPerson(sp, `${path}.spouses[${i}]`)).join('') : '';
+    branches.push(`
+      <li>
+        <div class="chart-node chart-group" data-toggle="${groupPath}">
+          <i class="fas fa-chevron-right ${exp ? 'expanded' : ''}"></i>
+          <i class="fas fa-ring"></i> Spouses <span class="chart-count">${member.spouses.length}</span>
+        </div>
+        ${inner ? `<ul>${inner}</ul>` : ''}
+      </li>`);
+  }
+
+  if (member.children && member.children.length > 0)
+  {
+    const groupPath = `${path}.children`;
+    const exp = isExpanded(groupPath);
+    const inner = exp ? member.children.map((ch, i) => renderDiagramPerson(ch, `${path}.children[${i}]`)).join('') : '';
+    branches.push(`
+      <li>
+        <div class="chart-node chart-group" data-toggle="${groupPath}">
+          <i class="fas fa-chevron-right ${exp ? 'expanded' : ''}"></i>
+          <i class="fas fa-users"></i> Children <span class="chart-count">${member.children.length}</span>
+        </div>
+        ${inner ? `<ul>${inner}</ul>` : ''}
+      </li>`);
+  }
+
+  return `
+    <li>
+      <div class="chart-node chart-person ${genderClass}" data-path="${path}">
+        <span class="chart-name">${displayName}</span>
+        <span class="chart-serial">#${member.serial ?? 'N/A'}</span>
+      </div>
+      ${branches.length ? `<ul>${branches.join('')}</ul>` : ''}
+    </li>`;
+}
 
 // Load family tree data
 function loadFamilyTree()
@@ -22,7 +195,7 @@ function loadFamilyTree()
   if (data)
   {
     document.getElementById('loadingState').style.display = 'none';
-    document.getElementById('treeContent').style.display = 'block';
+    applyViewVisibility();
     collapseAll();
     document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
   }
@@ -35,7 +208,7 @@ function loadFamilyTree()
         data = json;
         storeJsonLocally(data);
         document.getElementById('loadingState').style.display = 'none';
-        document.getElementById('treeContent').style.display = 'block';
+        applyViewVisibility();
         collapseAll();
         document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
       }
@@ -66,7 +239,30 @@ function renderTree()
   container.innerHTML = '';
   container.appendChild(renderMember(data.rootPerson, null, 'root', 0));
 
-  document.querySelector("#totalMembers").textContent = `${collectMembers().length}`;
+  updateStats();
+}
+
+// Compute and display headcount + marital-status breakdown
+function updateStats()
+{
+  const members = collectMembers();
+  const counts = { Male: 0, Female: 0, Married: 0, Single: 0, Divorced: 0, Widowed: 0, Separated: 0 };
+  members.forEach(m =>
+  {
+    if (m.gender === 'Male') counts.Male++;
+    else if (m.gender === 'Female') counts.Female++;
+    if (Object.prototype.hasOwnProperty.call(counts, m.maritalStatus)) counts[m.maritalStatus]++;
+  });
+
+  const set = (id, value) => { const el = document.getElementById(id); if (el) el.textContent = value; };
+  set('totalMembers', members.length);
+  set('statMale', counts.Male);
+  set('statFemale', counts.Female);
+  set('statMarried', counts.Married);
+  set('statSingle', counts.Single);
+  set('statDivorced', counts.Divorced);
+  set('statWidowed', counts.Widowed);
+  set('statSeparated', counts.Separated);
 }
 
 // Build a flat list of all members with their paths
@@ -83,6 +279,7 @@ function collectMembers()
       maritalStatus: member.maritalStatus || '',
       spousesCount: (member.spouses && member.spouses.length) || 0,
       childrenCount: (member.children && member.children.length) || 0,
+      privacy: member.privacy || 'public',
       path
     });
     if (member.spouses)
@@ -111,8 +308,6 @@ function setupSearchAndFilters()
   const spousesSel = document.getElementById('filterSpouses');
   const unifiedList = document.getElementById('filterResults');
   if (!input || !applyBtn || !unifiedList) return;
-
-  const getCurrentRole = () => document.querySelector('.container')?.getAttribute('role') || 'reader';
 
   // store last results HTML to restore
   let lastResultsHTML = '';
@@ -173,6 +368,42 @@ function setupSearchAndFilters()
     lastResultsHTML = unifiedList.innerHTML;
     const countEl = document.getElementById('resultsCount');
     if (countEl) countEl.textContent = filtered.length ? `Results (${filtered.length})` : '';
+  }
+
+  // Clicking a demographics stat quick-filters and shows matching members
+  const statsPanel = document.getElementById('statsPanel');
+  if (statsPanel)
+  {
+    const applyStatFilter = (block) =>
+    {
+      const type = block.dataset.filterType;
+      const value = block.dataset.filterValue;
+      if (!type || !value) return;
+
+      if (input) input.value = '';
+      if (genderSel) genderSel.value = type === 'gender' ? value : '';
+      if (maritalSel) maritalSel.value = type === 'marital' ? value : '';
+      if (childrenSel) childrenSel.value = '';
+      if (spousesSel) spousesSel.value = '';
+
+      computeAndRenderResults();
+      unifiedList.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
+
+    statsPanel.addEventListener('click', (e) =>
+    {
+      const block = e.target.closest('.stat-block');
+      if (block) applyStatFilter(block);
+    });
+
+    statsPanel.addEventListener('keydown', (e) =>
+    {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const block = e.target.closest('.stat-block');
+      if (!block) return;
+      e.preventDefault();
+      applyStatFilter(block);
+    });
   }
 
   // Debounce using animation frames instead of timeouts
@@ -280,9 +511,12 @@ async function navigateToPath(path)
 // Render individual family member
 function renderMember(member, parent, path, level)
 {
+  const node = document.createElement('div');
+  node.className = 'member-node';
+  node.setAttribute('data-path', path);
+
   const card = document.createElement('div');
   card.className = 'member-card' + (member.gender == "Female" ? " female" : " male");
-  card.style.animationDelay = `${level * 0.1}s`;
   card.setAttribute('data-path', path);
 
   // Determine if member is deceased
@@ -310,8 +544,14 @@ function renderMember(member, parent, path, level)
     details.push({ icon: 'cross', label: 'Died', value: formatDate(member.dod) });
   }
 
+  if (member.phone)
+    details.push({ icon: 'phone', label: 'Phone', value: member.phone, cls: 'contact-field' });
+
+  if (member.email)
+    details.push({ icon: 'envelope', label: 'Email', value: member.email, cls: 'contact-field' });
+
   const detailsHTML = details.map(detail => `
-        <div class="detail-item" value="${detail.value}">
+        <div class="detail-item ${detail.cls || ''}" value="${detail.value}">
           <i class="fas fa-${detail.icon}"></i>
           <span>${detail.value}</span>
         </div>
@@ -335,40 +575,42 @@ function renderMember(member, parent, path, level)
             <div class="member-details">
               ${detailsHTML}
             </div>
+            ${member.address ? `<div class="member-address"><i class="fas fa-map-marker-alt"></i> ${member.address}</div>` : ''}
             ${member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${member.notes}</div>` : ''}
           </div>
         </div>
         <div class="card-actions">
-          <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${path}')">
-            <i class="fas fa-ring"></i> Add Spouse
+          <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${path}')" title="Add Spouse">
+            <i class="fas fa-ring"></i><span class="btn-label">Add Spouse</span>
           </button>
-          <button class="btn btn-primary btn-sm" onclick="showModal('child', '${path}')">
-            <i class="fas fa-baby"></i> Add Child
+          <button class="btn btn-primary btn-sm" onclick="showModal('child', '${path}')" title="Add Child">
+            <i class="fas fa-baby"></i><span class="btn-label">Add Child</span>
           </button>
-          <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${path}')">
-            <i class="fas fa-edit"></i> Edit
+          <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${path}')" title="Edit">
+            <i class="fas fa-edit"></i><span class="btn-label">Edit</span>
           </button>
-          ${path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${path}')"><i class="fas fa-trash"></i> Delete</button>` : ''}
+          ${path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${path}')" title="Delete"><i class="fas fa-trash"></i><span class="btn-label">Delete</span></button>` : ''}
         </div>
       `;
+
+  card.setAttribute("privacy", member.privacy || "public");
+  node.appendChild(card);
 
   // Add spouses section
   if (member.spouses && member.spouses.length > 0)
   {
     const spousesSection = createSection('spouses', path, member, 'Spouses', 'ring', level);
-    card.appendChild(spousesSection);
+    node.appendChild(spousesSection);
   }
 
   // Add children section
   if (member.children && member.children.length > 0)
   {
     const childrenSection = createSection('children', path, member, 'Children', 'users', level);
-    card.appendChild(childrenSection);
+    node.appendChild(childrenSection);
   }
 
-  card.setAttribute("privacy", member.privacy || "public");
-
-  return card;
+  return node;
 }
 
 // Create expandable section (spouses/children)
@@ -383,11 +625,12 @@ function createSection(type, path, member, title, icon, level)
   const sectionHeader = document.createElement('div');
   sectionHeader.className = 'section-header';
   sectionHeader.innerHTML = `
-        <button class="toggle-btn ${isExp ? 'expanded' : ''}" >
+        <button type="button" class="toggle-btn ${isExp ? 'expanded' : ''}" aria-expanded="${isExp}" aria-label="Toggle ${title}">
           <i class="fas fa-chevron-right"></i>
         </button>
         <i class="fas fa-${icon}"></i>
         <span class="section-title" mValue="${member[type].length}">${title}</span>
+        <span class="section-count">${member[type].length}</span>
       `;
 
   sectionHeader.onclick = () => toggleSection(sectionPath);
@@ -427,6 +670,7 @@ function toggleSection(sectionPath)
   {
     // Expanding
     toggleBtn.classList.add('expanded');
+    toggleBtn.setAttribute('aria-expanded', 'true');
     treeConnections.classList.add('expanded');
     sectionContent.className = 'section-content expanded';
 
@@ -451,6 +695,7 @@ function toggleSection(sectionPath)
   {
     // Collapsing
     toggleBtn.classList.remove('expanded');
+    toggleBtn.setAttribute('aria-expanded', 'false');
     treeConnections.classList.remove('expanded');
     sectionContent.className = 'section-content collapsed';
 
@@ -541,6 +786,8 @@ function showModal(type, path)
     member = getByPath(path);
     title.textContent = 'Edit Family Member';
     subtitle.textContent = `Update information for ${member.name}`;
+    const addressLabel = document.getElementById('addressLabel');
+    if (addressLabel) addressLabel.textContent = 'Address';
 
     // Populate form with existing data
     Object.keys(member).forEach(key =>
@@ -555,6 +802,18 @@ function showModal(type, path)
   {
     title.textContent = type === 'spouse' ? 'Add Spouse' : 'Add Child';
     subtitle.textContent = `Add new ${type} to the family tree`;
+
+    // Inherit address from the spouse/parent this member is being added to
+    const relative = getByPath(path);
+    const addressLabel = document.getElementById('addressLabel');
+    if (relative && relative.address)
+    {
+      form.querySelector('[name="address"]').value = relative.address;
+      if (addressLabel) addressLabel.textContent = `Address (same as ${relative.name || 'relative'})`;
+    } else if (addressLabel)
+    {
+      addressLabel.textContent = 'Address';
+    }
   }
 
   // Store form context
@@ -562,6 +821,11 @@ function showModal(type, path)
   form.dataset.path = path;
 
   modal.classList.add('show');
+  requestAnimationFrame(() =>
+  {
+    const firstInput = form.querySelector('input[name="name"]');
+    if (firstInput) firstInput.focus();
+  });
 }
 
 // Close modal
@@ -629,7 +893,7 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
         else
         {
           const spousesSection = createSection('spouses', spousesPath, parent, 'Spouses', 'users', path.split('.').length);
-          document.querySelector(`.member-card[data-path="${path}"]`).appendChild(spousesSection);
+          document.querySelector(`.member-node[data-path="${path}"]`).appendChild(spousesSection);
         }
       }
     }
@@ -653,7 +917,7 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
         else
         {
           const childrenSection = createSection('children', childrenPath, parent, 'Children', 'users', path.split('.').length);
-          document.querySelector(`.member-card[data-path="${path}"]`).appendChild(childrenSection);
+          document.querySelector(`.member-node[data-path="${path}"]`).appendChild(childrenSection);
         }
       }
     }
@@ -670,16 +934,21 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
         {
           header.textContent = `Spouses`;
           header.setAttribute("mValue", parent.spouses.length);
+          const count = header.parentElement.querySelector('.section-count');
+          if (count) count.textContent = parent.spouses.length;
         } else if (type === 'child' && text.includes('Children'))
         {
           header.textContent = `Children`;
           header.setAttribute("mValue", parent.children.length);
+          const count = header.parentElement.querySelector('.section-count');
+          if (count) count.textContent = parent.children.length;
         }
       });
     }
   }
 
   closeModal();
+  updateStats();
   uploadDataToServer();
 });
 
@@ -749,17 +1018,22 @@ function deleteMember(path)
           if (arrayName === 'spouses' && text.includes('Spouses'))
           {
             header.textContent = `Spouses`;
-            header.setAttribute("value", parent.spouses.length);
+            header.setAttribute("mValue", parent.spouses.length);
+            const count = header.parentElement.querySelector('.section-count');
+            if (count) count.textContent = parent.spouses.length;
           } else if (arrayName === 'children' && text.includes('Children'))
           {
             header.textContent = `Children`;
-            header.setAttribute("value", parent.children.length);
+            header.setAttribute("mValue", parent.children.length);
+            const count = header.parentElement.querySelector('.section-count');
+            if (count) count.textContent = parent.children.length;
           }
         });
       }
     }
   }
 
+  updateStats();
   uploadDataToServer();
 }
 
@@ -909,6 +1183,15 @@ document.getElementById('modal').addEventListener('click', function (e)
   }
 });
 
+// Close modal with Escape key
+document.addEventListener('keydown', function (e)
+{
+  if (e.key === 'Escape' && document.getElementById('modal').classList.contains('show'))
+  {
+    closeModal();
+  }
+});
+
 
 function storeJsonLocally(data)
 {
@@ -1000,3 +1283,4 @@ window.exportJSON = exportJSON;
 window.importJSON = importJSON;
 window.onDBClick = onDBClick;
 window.navigateToPath = navigateToPath;
+window.setView = setView;
