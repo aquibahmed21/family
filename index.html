@@ -37,63 +37,114 @@
   <!-- Main Container -->
   <div class="container">
 
-    <!-- Demographics -->
-    <div class="stats-panel" id="statsPanel">
-      <div class="stat-block" tabindex="0" role="button" data-filter-type="gender" data-filter-value="Male" title="Show all male members">
-        <span class="stat-value" id="statMale">0</span>
-        <span class="stat-label"><i class="fas fa-mars"></i> Male</span>
+    <!-- View switcher + Insights menu -->
+    <div class="view-row">
+      <div class="view-toggle" role="tablist" aria-label="Tree views">
+        <button class="icon-btn view-btn active" type="button" data-view="tree" onclick="setView('tree')" title="Family tree" aria-label="Tree" aria-pressed="true">
+          <i class="fas fa-sitemap"></i> <span class="btn-label">Tree</span>
+        </button>
+        <button class="icon-btn view-btn" type="button" data-view="diagram" onclick="setView('diagram')" title="Family chart" aria-label="Chart" aria-pressed="false">
+          <i class="fas fa-share-nodes"></i> <span class="btn-label">Chart</span>
+        </button>
+        <button class="icon-btn view-btn" type="button" data-view="relations" onclick="setView('relations')" title="How are two people connected?" aria-label="Connections" aria-pressed="false">
+          <i class="fas fa-link"></i> <span class="btn-label">Connections</span>
+        </button>
+        <button class="icon-btn view-btn" type="button" data-view="columns" onclick="setView('columns')" title="Browse generation by generation" aria-label="Browse" aria-pressed="false">
+          <i class="fas fa-table-columns"></i> <span class="btn-label">Browse</span>
+        </button>
+        <button class="icon-btn view-btn" type="button" data-view="list" onclick="setView('list')" title="People directory" aria-label="Directory" aria-pressed="false">
+          <i class="fas fa-list-ul"></i> <span class="btn-label">Directory</span>
+        </button>
       </div>
-      <div class="stat-block" tabindex="0" role="button" data-filter-type="gender" data-filter-value="Female" title="Show all female members">
-        <span class="stat-value" id="statFemale">0</span>
-        <span class="stat-label"><i class="fas fa-venus"></i> Female</span>
-      </div>
-      <span class="stat-divider"></span>
-      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Married" title="Show all married members">
-        <span class="stat-value" id="statMarried">0</span>
-        <span class="stat-label">Married</span>
-      </div>
-      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Single" title="Show all single members">
-        <span class="stat-value" id="statSingle">0</span>
-        <span class="stat-label">Single</span>
-      </div>
-      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Widowed" title="Show all widowed members">
-        <span class="stat-value" id="statWidowed">0</span>
-        <span class="stat-label">Widowed</span>
-      </div>
-      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Divorced" title="Show all divorced members">
-        <span class="stat-value" id="statDivorced">0</span>
-        <span class="stat-label">Divorced</span>
-      </div>
-      <div class="stat-block stat-marital" tabindex="0" role="button" data-filter-type="marital" data-filter-value="Separated" title="Show all separated members">
-        <span class="stat-value" id="statSeparated">0</span>
-        <span class="stat-label">Separated</span>
-      </div>
-    </div>
 
-    <!-- View switcher: always available, independent of search/filter access -->
-    <div class="view-toggle" role="tablist" aria-label="Tree views">
-      <button class="icon-btn view-btn active" type="button" data-view="tree" onclick="setView('tree')" title="Tree view" aria-label="Tree view" aria-pressed="true">
-        <i class="fas fa-sitemap"></i> <span class="btn-label">Tree</span>
+      <!-- Search / filters toggle -->
+      <button class="insights-btn search-toggle" id="searchToggleBtn" type="button" aria-expanded="false" aria-controls="filterPanel" title="Search and filter">
+        <i class="fas fa-search"></i> <span class="btn-label">Search</span>
       </button>
-      <button class="icon-btn view-btn" type="button" data-view="list" onclick="setView('list')" title="List view" aria-label="List view" aria-pressed="false">
-        <i class="fas fa-list-ul"></i> <span class="btn-label">List</span>
-      </button>
-      <button class="icon-btn view-btn" type="button" data-view="diagram" onclick="setView('diagram')" title="Diagram view" aria-label="Diagram view" aria-pressed="false">
-        <i class="fas fa-share-nodes"></i> <span class="btn-label">Diagram</span>
-      </button>
-    </div>
 
-    <!-- Search / Filters / Toolbar -->
-    <div class="filter-panel">
+      <!-- Demographics menu -->
+      <div class="insights" id="insights">
+        <button class="insights-btn" id="insightsBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="statsPanel">
+          <i class="fas fa-chart-pie"></i> <span class="btn-label">Insights</span>
+          <i class="fas fa-chevron-down insights-caret"></i>
+        </button>
+        <div class="stats-panel" id="statsPanel" hidden>
+          <div class="stats-total">
+            <span class="stat-value" id="statTotal">0</span>
+            <span class="stat-label">family members</span>
+          </div>
 
-      <div class="control-row">
-        <div class="search-box">
-          <i class="fas fa-search"></i>
-          <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
-          <button id="clearSearchBtn" class="clear-input" type="button" title="Clear search"><i
-              class="fas fa-times"></i></button>
+          <div class="stats-section">
+            <h3 class="stats-title">Gender</h3>
+            <div class="stat-split" aria-hidden="true">
+              <span class="split-male" id="splitMale"></span><span class="split-female" id="splitFemale"></span>
+            </div>
+            <div class="stat-list stat-list-gender">
+            <button type="button" class="stat-block stat-male" data-filter-type="gender" data-filter-value="Male" title="Show all male members">
+              <span class="stat-label"><i class="fas fa-mars"></i> Male</span>
+              <span class="stat-bar"><span class="stat-fill" id="barMale"></span></span>
+              <span class="stat-value" id="statMale">0</span>
+            </button>
+            <button type="button" class="stat-block stat-female" data-filter-type="gender" data-filter-value="Female" title="Show all female members">
+              <span class="stat-label"><i class="fas fa-venus"></i> Female</span>
+              <span class="stat-bar"><span class="stat-fill" id="barFemale"></span></span>
+              <span class="stat-value" id="statFemale">0</span>
+            </button>
+            </div>
+          </div>
+
+          <div class="stats-section stat-marital">
+            <h3 class="stats-title">Marital status</h3>
+            <div class="stat-list">
+            <button type="button" class="stat-block" data-filter-type="marital" data-filter-value="Married" title="Show all married members">
+              <span class="stat-label">Married</span>
+              <span class="stat-bar"><span class="stat-fill" id="barMarried"></span></span>
+              <span class="stat-value" id="statMarried">0</span>
+            </button>
+            <button type="button" class="stat-block" data-filter-type="marital" data-filter-value="Single" title="Show all single members">
+              <span class="stat-label">Single</span>
+              <span class="stat-bar"><span class="stat-fill" id="barSingle"></span></span>
+              <span class="stat-value" id="statSingle">0</span>
+            </button>
+            <button type="button" class="stat-block" data-filter-type="marital" data-filter-value="Widowed" title="Show all widowed members">
+              <span class="stat-label">Widowed</span>
+              <span class="stat-bar"><span class="stat-fill" id="barWidowed"></span></span>
+              <span class="stat-value" id="statWidowed">0</span>
+            </button>
+            <button type="button" class="stat-block" data-filter-type="marital" data-filter-value="Divorced" title="Show all divorced members">
+              <span class="stat-label">Divorced</span>
+              <span class="stat-bar"><span class="stat-fill" id="barDivorced"></span></span>
+              <span class="stat-value" id="statDivorced">0</span>
+            </button>
+            <button type="button" class="stat-block" data-filter-type="marital" data-filter-value="Separated" title="Show all separated members">
+              <span class="stat-label">Separated</span>
+              <span class="stat-bar"><span class="stat-fill" id="barSeparated"></span></span>
+              <span class="stat-value" id="statSeparated">0</span>
+            </button>
+            </div>
+          </div>
         </div>
+      </div>
 
+      <!-- Data menu (import / export) -->
+      <div class="insights data-menu" id="dataMenu">
+        <button class="insights-btn" id="dataBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="dataPanel">
+          <i class="fas fa-database"></i> <span class="btn-label">Data</span>
+          <i class="fas fa-chevron-down insights-caret"></i>
+        </button>
+        <div class="stats-panel menu-panel" id="dataPanel" hidden>
+          <button type="button" class="menu-item" onclick="exportJSON()">
+            <i class="fas fa-download"></i> Export JSON
+          </button>
+          <label class="menu-item">
+            <i class="fas fa-upload"></i> Import JSON
+            <input type="file" id="importFile" accept=".json" hidden onchange="importJSON(event)">
+          </label>
+        </div>
+      </div>
+
+      <div class="view-row-end">
+        <!-- Tree actions -->
         <div class="toolbar" role="toolbar" aria-label="Tree actions">
           <button class="icon-btn" type="button" onclick="expandAll()" title="Expand All" aria-label="Expand All">
             <i class="fas fa-expand-arrows-alt"></i>
@@ -101,28 +152,34 @@
           <button class="icon-btn" type="button" onclick="collapseAll()" title="Collapse All" aria-label="Collapse All">
             <i class="fas fa-compress-arrows-alt"></i>
           </button>
-          <span class="toolbar-divider"></span>
-          <button class="icon-btn" type="button" onclick="exportJSON()" title="Export JSON" aria-label="Export JSON">
-            <i class="fas fa-download"></i>
-          </button>
-          <label class="icon-btn" title="Import JSON" aria-label="Import JSON">
-            <i class="fas fa-upload"></i>
-            <input type="file" id="importFile" accept=".json" hidden onchange="importJSON(event)">
-          </label>
         </div>
+        <!-- Global edit mode: unlocks inline toggles on member cards -->
+        <button class="insights-btn edit-toggle" id="editModeBtn" type="button" aria-pressed="false" title="Quick edit: change names, gender, marital, life or privacy right on the cards, then press Done to save" onclick="setEditMode(!document.querySelector('.container').hasAttribute('data-edit'))">
+          <i class="fas fa-pen-to-square"></i> <span class="btn-label">Quick edit</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Search / Filters -->
+    <div class="filter-panel" id="filterPanel" hidden>
+      <div class="search-box">
+        <i class="fas fa-search"></i>
+        <input id="searchInput" type="text" placeholder="Search by name or #serial..." autocomplete="off" />
+        <button id="clearSearchBtn" class="clear-input" type="button" title="Clear search"><i
+            class="fas fa-times"></i></button>
       </div>
 
       <div class="filters">
-        <div class="filter-item">
-          <label>Gender</label>
+        <label class="filter-chip">
+          <span>Gender</span>
           <select id="filterGender">
             <option value="">Any</option>
             <option value="Male">Male</option>
             <option value="Female">Female</option>
           </select>
-        </div>
-        <div class="filter-item">
-          <label>Marital Status</label>
+        </label>
+        <label class="filter-chip">
+          <span>Marital</span>
           <select id="filterMarital">
             <option value="">Any</option>
             <option value="Single">Single</option>
@@ -131,28 +188,26 @@
             <option value="Widowed">Widowed</option>
             <option value="Separated">Separated</option>
           </select>
-        </div>
-        <div class="filter-item">
-          <label>Has Children</label>
+        </label>
+        <label class="filter-chip">
+          <span>Children</span>
           <select id="filterChildren">
             <option value="">Any</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
+            <option value="yes">Has</option>
+            <option value="no">None</option>
           </select>
-        </div>
-        <div class="filter-item">
-          <label>Has Spouses</label>
+        </label>
+        <label class="filter-chip">
+          <span>Spouses</span>
           <select id="filterSpouses">
             <option value="">Any</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
+            <option value="yes">Has</option>
+            <option value="no">None</option>
           </select>
-        </div>
-        <div class="buttonContainer">
-          <button class="btn btn-outline" id="applyFiltersBtn"><i class="fas fa-filter"></i> Apply Filters</button>
-          <button class="btn btn-outline" id="clearFiltersBtn"><i class="fas fa-eraser"></i> Clear Filters</button>
-        </div>
+        </label>
+        <button class="clear-filters" id="clearFiltersBtn" type="button"><i class="fas fa-rotate-left"></i> Reset</button>
       </div>
+
       <div class="results-header"><span id="resultsCount"></span></div>
       <div id="filterResults" class="results-list"></div>
     </div>
@@ -166,165 +221,172 @@
       <div id="treeContent" class="tree" style="display: none;"></div>
       <div id="listContent" class="list-view" style="display: none;"></div>
       <div id="diagramContent" class="diagram-view" style="display: none;"></div>
+      <div id="relationsContent" class="relations-view" style="display: none;"></div>
+      <div id="columnsContent" class="columns-view" style="display: none;"></div>
     </div>
   </div>
 
-  <!-- Modal -->
-  <div id="modal" class="modal">
+  <!-- Member modal -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title" id="modalTitle">Add Family Member</h2>
-        <p class="modal-subtitle" id="modalSubtitle">Fill in the information below</p>
+        <span class="modal-avatar" id="modalAvatar" aria-hidden="true"><i class="fas fa-user"></i></span>
+        <div class="modal-heading">
+          <h2 class="modal-title" id="modalTitle">Add Family Member</h2>
+          <p class="modal-subtitle" id="modalSubtitle">Fill in the information below</p>
+        </div>
+        <button type="button" class="modal-close" onclick="closeModal()" title="Close" aria-label="Close"><i class="fas fa-times"></i></button>
       </div>
+
+      <div class="modal-tabs" role="tablist">
+        <button type="button" class="modal-tab active" role="tab" data-tab="basics"><i class="fas fa-id-card"></i> Basics</button>
+        <button type="button" class="modal-tab" role="tab" data-tab="life"><i class="fas fa-heart-pulse"></i> Life</button>
+        <button type="button" class="modal-tab" role="tab" data-tab="contact"><i class="fas fa-address-book"></i> Contact</button>
+      </div>
+
       <div class="modal-body">
         <form id="memberForm">
 
-          <h3 class="form-section-title">Basic Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Full Name *</label>
-              <input type="text" name="name" class="form-control" required placeholder="Enter full name">
+          <section class="form-panel active" data-panel="basics">
+            <div class="form-grid">
+              <div class="form-group span-2">
+                <label class="form-label">Full name <b>*</b></label>
+                <input type="text" name="name" class="form-control" required placeholder="e.g. Abdul Majeed">
+              </div>
+              <div class="form-group span-2">
+                <label class="form-label">Alternate / family name</label>
+                <input type="text" name="alternateName" class="form-control" placeholder="Optional">
+              </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Alternate/Family Name</label>
-              <input type="text" name="alternateName" class="form-control" placeholder="Enter alternate/family name">
+              <span class="form-label">Gender <b>*</b></span>
+              <div class="seg">
+                <label class="seg-option" data-value="Male">
+                  <input type="radio" name="gender" value="Male" checked>
+                  <span><i class="fas fa-mars"></i> Male</span>
+                </label>
+                <label class="seg-option" data-value="Female">
+                  <input type="radio" name="gender" value="Female">
+                  <span><i class="fas fa-venus"></i> Female</span>
+                </label>
+              </div>
             </div>
-          </div>
 
-          <div class="form-group">
-            <label class="form-label">Gender *</label>
-            <div class="form-control radio-group">
-              <label gender="Male">
-                <input type="radio" name="gender" value="Male" checked>
-                <span>Male</span>
-              </label>
-              <label gender="Female">
-                <input type="radio" name="gender" value="Female">
-                <span>Female</span>
-              </label>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Religion</label>
+                <input type="text" name="religion" class="form-control" value="Muslim" placeholder="Enter religion">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Profile image URL</label>
+                <input type="url" name="image" class="form-control" placeholder="https://...">
+              </div>
             </div>
-          </div>
+          </section>
 
-          <h3 class="form-section-title">Status</h3>
-          <div class="form-grid">
+          <section class="form-panel" data-panel="life">
             <div class="form-group">
-              <label class="form-label">Life Status</label>
-              <div class="form-control radio-group">
-                <label status="alive">
+              <span class="form-label">Life status</span>
+              <div class="seg">
+                <label class="seg-option" data-value="alive">
                   <input type="radio" name="status" value="alive" checked>
-                  <span>Alive</span>
+                  <span><i class="fas fa-seedling"></i> Alive</span>
                 </label>
-                <label status="deceased">
+                <label class="seg-option" data-value="deceased">
                   <input type="radio" name="status" value="deceased">
-                  <span>Deceased</span>
+                  <span><i class="fas fa-dove"></i> Deceased</span>
                 </label>
               </div>
             </div>
 
             <div class="form-group">
-              <label class="form-label">Privacy</label>
-              <div class="form-control radio-group">
-                <label>
+              <span class="form-label">Marital status</span>
+              <div class="seg seg-wrap">
+                <label class="seg-option" data-value="Single">
+                  <input type="radio" name="maritalStatus" value="Single">
+                  <span>Single</span>
+                </label>
+                <label class="seg-option" data-value="Married">
+                  <input type="radio" name="maritalStatus" value="Married" checked>
+                  <span>Married</span>
+                </label>
+                <label class="seg-option" data-value="Divorced">
+                  <input type="radio" name="maritalStatus" value="Divorced">
+                  <span>Divorced</span>
+                </label>
+                <label class="seg-option" data-value="Widowed">
+                  <input type="radio" name="maritalStatus" value="Widowed">
+                  <span>Widowed</span>
+                </label>
+                <label class="seg-option" data-value="Separated">
+                  <input type="radio" name="maritalStatus" value="Separated">
+                  <span>Separated</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Date of birth</label>
+                <input type="date" name="dob" class="form-control">
+              </div>
+              <div class="form-group only-deceased">
+                <label class="form-label">Date of death</label>
+                <input type="date" name="dod" class="form-control">
+              </div>
+            </div>
+          </section>
+
+          <section class="form-panel" data-panel="contact">
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Phone</label>
+                <input type="tel" name="phone" class="form-control" placeholder="Phone number">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" placeholder="Email address">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" id="addressLabel">Address</label>
+              <textarea name="address" id="addressInput" class="form-control" rows="2" placeholder="Home address"></textarea>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Notes</label>
+              <textarea name="notes" class="form-control" rows="2" placeholder="Anything worth remembering..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <span class="form-label">Who can see this person</span>
+              <div class="seg">
+                <label class="seg-option" data-value="public">
                   <input type="radio" name="privacy" value="public" checked>
-                  <span>Public</span>
+                  <span><i class="fas fa-globe"></i> Public</span>
                 </label>
-                <label>
+                <label class="seg-option" data-value="protected">
                   <input type="radio" name="privacy" value="protected">
-                  <span>Protected</span>
+                  <span><i class="fas fa-user-shield"></i> Protected</span>
                 </label>
-                <label>
+                <label class="seg-option" data-value="private">
                   <input type="radio" name="privacy" value="private">
-                  <span>Private</span>
+                  <span><i class="fas fa-lock"></i> Private</span>
                 </label>
               </div>
+              <p class="form-hint" id="privacyHint"></p>
             </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Marital Status</label>
-            <div class="form-control radio-group">
-              <label>
-                <input type="radio" name="maritalStatus" value="Single">
-                <span>Single</span>
-              </label>
-              <label>
-                <input type="radio" name="maritalStatus" value="Married" checked>
-                <span>Married</span>
-              </label>
-              <label>
-                <input type="radio" name="maritalStatus" value="Divorced">
-                <span>Divorced</span>
-              </label>
-              <label>
-                <input type="radio" name="maritalStatus" value="Widowed">
-                <span>Widowed</span>
-              </label>
-              <label>
-                <input type="radio" name="maritalStatus" value="Separated">
-                <span>Separated</span>
-              </label>
-            </div>
-          </div>
-
-          <h3 class="form-section-title">Life Events</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Date of Birth</label>
-              <input type="date" name="dob" class="form-control">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Date of Death</label>
-              <input type="date" name="dod" class="form-control">
-            </div>
-          </div>
-
-          <h3 class="form-section-title">Additional Details</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Religion</label>
-              <input type="text" name="religion" class="form-control" value="Muslim" placeholder="Enter religion">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Profile Image URL</label>
-              <input type="url" name="image" class="form-control" placeholder="https://example.com/image.jpg">
-            </div>
-          </div>
-
-          <h3 class="form-section-title">Contact Information</h3>
-          <div class="form-grid">
-            <div class="form-group">
-              <label class="form-label">Phone</label>
-              <input type="tel" name="phone" class="form-control" placeholder="Enter phone number">
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Email</label>
-              <input type="email" name="email" class="form-control" placeholder="Enter email address">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label" id="addressLabel">Address</label>
-            <textarea name="address" id="addressInput" class="form-control" rows="2" placeholder="Enter home address"></textarea>
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Notes</label>
-            <textarea name="notes" class="form-control" rows="3" placeholder="Additional information..."></textarea>
-          </div>
+          </section>
         </form>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline" onclick="closeModal()">
-          <i class="fas fa-times"></i>
-          Cancel
-        </button>
+        <span class="modal-required"><b>*</b> required</span>
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
         <button type="submit" form="memberForm" class="btn btn-primary">
           <i class="fas fa-save"></i>
-          Save Member
+          Save member
         </button>
       </div>
     </div>
