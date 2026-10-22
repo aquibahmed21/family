@@ -3,7 +3,7 @@ let data = null;
 let expandState = {};
 let currentView = localStorage.getItem('view') || 'tree';
 if (currentView === 'families') currentView = 'relations'; // renamed view
-const baseURL = 'https://organised-stayed-homeland-constant.trycloudflare.com/';
+const baseURL = 'https://web-push-3zaz.onrender.com/';
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function ()
