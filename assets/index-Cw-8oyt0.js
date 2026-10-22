@@ -294,7 +294,7 @@ let relB = null;
 function buildRelationGraph(role) {
   const nodes = /* @__PURE__ */ new Map();
   const node = (m, path) => {
-    if (!nodes.has(path)) nodes.set(path, { m, path, up: [], down: [], spouse: [] });
+    if (!nodes.has(path)) nodes.set(path, { m, path, up: [], down: [], spouse: [], sibling: [], cousin: [] });
     return nodes.get(path);
   };
   (function walk(member, path) {
@@ -325,6 +325,15 @@ function buildRelationGraph(role) {
       walk(ch, chPath);
     });
   })(data.rootPerson, "root");
+  const idx = getRelationIndex();
+  ["sibling", "cousin"].forEach((type) => idx.edges[type].forEach((others, serial) => {
+    const a = idx.bySerial.get(serial);
+    if (!a || !nodes.has(a.path)) return;
+    others.forEach((o) => {
+      const b = idx.bySerial.get(o);
+      if (b && nodes.has(b.path)) nodes.get(a.path)[type].push(b.path);
+    });
+  }));
   return nodes;
 }
 function findRelationPath(nodes, from, to) {
@@ -336,7 +345,7 @@ function findRelationPath(nodes, from, to) {
     const cur = queue.shift();
     if (cur === to) break;
     const n = nodes.get(cur);
-    [["up", n.up], ["down", n.down], ["spouse", n.spouse]].forEach(([kind, list]) => {
+    [["up", n.up], ["down", n.down], ["spouse", n.spouse], ["sibling", n.sibling], ["cousin", n.cousin]].forEach(([kind, list]) => {
       list.forEach((next) => {
         if (prev.has(next)) return;
         prev.set(next, { from: cur, kind });
@@ -372,7 +381,9 @@ function describeRelation(nodes, chain) {
   if (!kinds.length) return `${nameA} and ${nameB} are the same person.`;
   const lastFemale = last.gender === "Female";
   const strip = (arr) => arr.filter((k) => k !== "spouse");
-  const blood = (arr, female) => {
+  const expand = (arr) => arr.flatMap((k) => k === "sibling" ? ["up", "down"] : k === "cousin" ? ["up", "up", "down", "down"] : [k]);
+  const blood = (list, female) => {
+    const arr = expand(list);
     const ups = arr.filter((k) => k === "up").length;
     const downs = arr.filter((k) => k === "down").length;
     const ordered = arr.map((k) => k + ",").join("").match(/^(up,)*(down,)*$/);
@@ -414,7 +425,7 @@ function renderRelationsView() {
   if (relA && !nodes.has(relA)) relA = null;
   if (relB && !nodes.has(relB)) relB = null;
   const chain = relA && relB ? findRelationPath(nodes, relA, relB) : null;
-  const hop = { up: "child of", down: "parent of", spouse: "married to" };
+  const hop = { up: "child of", down: "parent of", spouse: "married to", sibling: "sibling of", cousin: "cousin of" };
   let result = '<p class="col-empty">Pick two people to see how they are connected.</p>';
   if (relA && relB && !chain) result = '<p class="col-empty">No connection was found between these two people.</p>';
   if (chain) {
@@ -621,6 +632,7 @@ function loadFamilyTree() {
   });
 }
 function renderTree() {
+  invalidateRelationIndex();
   if (!data || !data.rootPerson) return;
   document.getElementById("familyName").textContent = data.familyName || "Family Tree";
   const container = document.getElementById("treeContent");
@@ -687,6 +699,8 @@ function collectMembers() {
       ownerName: visible(owner) && owner.name || "",
       spouseNames: names(member.spouses),
       childNames: names(member.children),
+      siblingNames: linkedRelatives(member, "sibling", role).map((r) => r.name).filter(Boolean),
+      cousinNames: linkedRelatives(member, "cousin", role).map((r) => r.name).filter(Boolean),
       path
     });
     if (member.spouses) {
@@ -708,6 +722,8 @@ function relationLines(m) {
   const list = (arr) => arr.length > 3 ? `${arr.slice(0, 3).join(", ")} +${arr.length - 3}` : arr.join(", ");
   if (m.spouseNames.length) lines.push({ icon: "fa-ring", text: `Spouse: <b>${list(m.spouseNames)}</b>` });
   if (m.childNames.length) lines.push({ icon: "fa-users", text: `Children: <b>${list(m.childNames)}</b>` });
+  if (m.siblingNames.length) lines.push({ icon: "fa-people-arrows", text: `Siblings: <b>${list(m.siblingNames)}</b>` });
+  if (m.cousinNames.length) lines.push({ icon: "fa-people-arrows", text: `Cousins: <b>${list(m.cousinNames)}</b>` });
   return lines;
 }
 function setupSearchAndFilters() {
@@ -914,6 +930,172 @@ async function navigateToPath(path) {
     }, { once: true });
   }
 }
+const LINK_TYPES = { sibling: "Sibling", cousin: "Cousin" };
+let relationIndexCache = null;
+function invalidateRelationIndex() {
+  relationIndexCache = null;
+}
+function getRelationIndex() {
+  if (relationIndexCache) return relationIndexCache;
+  const bySerial = /* @__PURE__ */ new Map();
+  (function walk(m, path) {
+    if (!m) return;
+    if (m.serial != null) bySerial.set(m.serial, { member: m, path });
+    (m.spouses || []).forEach((s, i) => walk(s, `${path}.spouses[${i}]`));
+    (m.children || []).forEach((c, i) => walk(c, `${path}.children[${i}]`));
+  })(data && data.rootPerson, "root");
+  const edges = { sibling: /* @__PURE__ */ new Map(), cousin: /* @__PURE__ */ new Map() };
+  const connect = (type, a, b) => {
+    if (a === b || !bySerial.has(a) || !bySerial.has(b)) return;
+    [[a, b], [b, a]].forEach(([x, y]) => {
+      if (!edges[type].has(x)) edges[type].set(x, /* @__PURE__ */ new Set());
+      edges[type].get(x).add(y);
+    });
+  };
+  bySerial.forEach(({ member }, serial) => (member.links || []).forEach((l) => {
+    if (edges[l.type]) connect(l.type, serial, l.serial);
+  }));
+  const sib = edges.sibling;
+  const seen = /* @__PURE__ */ new Set();
+  [...sib.keys()].forEach((start) => {
+    if (seen.has(start)) return;
+    const group = /* @__PURE__ */ new Set();
+    const stack = [start];
+    while (stack.length) {
+      const s = stack.pop();
+      if (group.has(s)) continue;
+      group.add(s);
+      (sib.get(s) || []).forEach((n) => stack.push(n));
+    }
+    group.forEach((s) => {
+      seen.add(s);
+      sib.set(s, new Set([...group].filter((x) => x !== s)));
+    });
+  });
+  relationIndexCache = { bySerial, edges };
+  return relationIndexCache;
+}
+function linkedRelatives(member, type, role = getCurrentRole()) {
+  if (!data || member.serial == null) return [];
+  const idx = getRelationIndex();
+  return [...idx.edges[type].get(member.serial) || []].map((serial) => ({ serial, ...idx.bySerial.get(serial) })).filter((r) => r.member && canSee(r.member, role)).map((r) => ({ serial: r.serial, name: r.member.name || "", path: r.path, member: r.member }));
+}
+function relativeLinksHTML(member) {
+  if (getCurrentRole() === "reader") return "";
+  return ["sibling", "cousin"].map((type) => {
+    const list = linkedRelatives(member, type);
+    if (!list.length) return "";
+    return `<div class="member-links"><i class="fas fa-people-arrows"></i>
+      <span class="link-label">${LINK_TYPES[type]}${list.length > 1 ? "s" : ""}</span>
+      ${list.map((r) => `<button type="button" class="link-chip" data-serial="${r.serial}">${r.name || "Unnamed"}</button>`).join("")}</div>`;
+  }).join("");
+}
+function directLinks(serial) {
+  const idx = getRelationIndex();
+  const out = [];
+  idx.bySerial.forEach(({ member }, ownerSerial) => (member.links || []).forEach((l, i) => {
+    if (!LINK_TYPES[l.type] || !idx.bySerial.has(l.serial)) return;
+    if (ownerSerial === serial) out.push({ type: l.type, other: l.serial, owner: ownerSerial });
+    else if (l.serial === serial) out.push({ type: l.type, other: ownerSerial, owner: ownerSerial });
+  }));
+  return out;
+}
+let linkTarget = null;
+let linksChanged = false;
+function openLinkModal(path) {
+  const member = getByPath(path);
+  if (!member) return;
+  if (member.serial == null) {
+    alert("This member has no serial number yet, so it cannot be linked.");
+    return;
+  }
+  linkTarget = member.serial;
+  linksChanged = false;
+  document.getElementById("linkSubtitle").textContent = `Relatives of ${member.name || "this member"} that the tree cannot show`;
+  document.getElementById("linkPerson").value = "";
+  renderLinkModal();
+  document.getElementById("linkModal").classList.add("show");
+  document.getElementById("linkPerson").focus();
+}
+function renderLinkModal() {
+  const idx = getRelationIndex();
+  const role = getCurrentRole();
+  const label = (m) => `${m.name || "Unnamed"} #${m.serial}`;
+  document.getElementById("linkPeople").innerHTML = [...idx.bySerial.values()].filter((r) => r.member.serial !== linkTarget && canSee(r.member, role)).map((r) => `<option value="${label(r.member).replace(/"/g, "")}"></option>`).join("");
+  const rows = directLinks(linkTarget).map((l) => {
+    const other = idx.bySerial.get(l.other).member;
+    return `<div class="link-row"><span class="link-type ${l.type}">${LINK_TYPES[l.type]}</span>
+      <span class="link-name">${other.name || "Unnamed"} <small>#${other.serial}</small></span>
+      <button type="button" class="link-remove" data-owner="${l.owner}" data-other="${l.other}" data-type="${l.type}" title="Remove link" aria-label="Remove link"><i class="fas fa-times"></i></button></div>`;
+  });
+  document.getElementById("linkList").innerHTML = rows.length ? rows.join("") : '<p class="col-empty">No links yet.</p>';
+}
+function afterLinkChange() {
+  linksChanged = true;
+  invalidateRelationIndex();
+  renderLinkModal();
+  if (currentView === "tree") renderTree();
+}
+function addLink() {
+  const input = document.getElementById("linkPerson");
+  const type = document.querySelector('#linkModal [name="linkType"]:checked').value;
+  const match = input.value.match(/#(\d+)\s*$/);
+  const idx = getRelationIndex();
+  const other = match && idx.bySerial.get(+match[1]);
+  if (!other || other.member.serial === linkTarget) {
+    input.setCustomValidity("Pick someone from the list");
+    input.reportValidity();
+    input.setCustomValidity("");
+    return;
+  }
+  const already = directLinks(linkTarget).some((l) => l.type === type && l.other === other.member.serial);
+  if (!already) {
+    const me = idx.bySerial.get(linkTarget).member;
+    me.links = me.links || [];
+    me.links.push({ type, serial: other.member.serial });
+    afterLinkChange();
+  }
+  input.value = "";
+  input.focus();
+}
+function removeLink(owner, other, type) {
+  const idx = getRelationIndex();
+  const holder = idx.bySerial.get(owner).member;
+  const target = owner === linkTarget ? other : linkTarget;
+  holder.links = (holder.links || []).filter((l) => !(l.type === type && l.serial === target));
+  if (!holder.links.length) delete holder.links;
+  afterLinkChange();
+}
+function closeLinkModal() {
+  document.getElementById("linkModal").classList.remove("show");
+  if (linksChanged) {
+    linksChanged = false;
+    uploadDataToServer();
+  }
+}
+document.getElementById("linkAddBtn").addEventListener("click", addLink);
+document.getElementById("linkPerson").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    addLink();
+  }
+});
+document.getElementById("linkList").addEventListener("click", (e) => {
+  const btn = e.target.closest(".link-remove");
+  if (btn) removeLink(+btn.dataset.owner, +btn.dataset.other, btn.dataset.type);
+});
+document.getElementById("linkModal").addEventListener("mousedown", (e) => {
+  if (e.target.id === "linkModal") closeLinkModal();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && document.getElementById("linkModal").classList.contains("show")) closeLinkModal();
+});
+document.addEventListener("click", (e) => {
+  const chip = e.target.closest(".link-chip");
+  if (!chip || !data) return;
+  const hit = getRelationIndex().bySerial.get(+chip.dataset.serial);
+  if (hit) navigateToPath(hit.path);
+});
 const PRIVACY_LABELS = { public: "Public", protected: "Protected", private: "Private" };
 const PRIVACY_ICONS = { public: "globe", protected: "user-shield", private: "lock" };
 function inlineEditOptions(field) {
@@ -1006,6 +1188,7 @@ function openChipMenu(chip) {
   menu.style.top = `${below ? rect.bottom + 6 : rect.top - height - 6}px`;
 }
 function applyInlineChange(path, field, value) {
+  invalidateRelationIndex();
   const member = getByPath(path);
   if (!member) return;
   if (field === "status") {
@@ -1123,6 +1306,7 @@ function renderMember(member, parent, path, level) {
             <div class="member-details">
               ${detailsHTML}
             </div>
+            ${relativeLinksHTML(member)}
             ${member.address ? `<div class="member-address"><i class="fas fa-map-marker-alt"></i> ${member.address}</div>` : ""}
             ${member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${member.notes}</div>` : ""}
           </div>
@@ -1132,6 +1316,9 @@ function renderMember(member, parent, path, level) {
             </button>
             <button class="btn btn-primary btn-sm" onclick="showModal('child', '${path}')" title="Add Child" aria-label="Add Child">
               <i class="fas fa-baby"></i><span class="btn-label">Add Child</span>
+            </button>
+            <button class="btn btn-primary btn-sm btn-link-rel" onclick="openLinkModal('${path}')" title="Link relatives (siblings, cousins)" aria-label="Link relatives">
+              <i class="fas fa-people-arrows"></i><span class="btn-label">Link</span>
             </button>
             <button class="btn btn-warning btn-sm" onclick="showModal('edit', '${path}')" title="Edit" aria-label="Edit">
               <i class="fas fa-edit"></i><span class="btn-label">Edit</span>
@@ -1299,7 +1486,8 @@ function showModal(type, path) {
   form.reset();
   let member = {};
   if (type === "edit") {
-    member = getByPath(path);
+    member = safeGetByPath(path);
+    if (!member) return;
     title.textContent = "Edit Family Member";
     subtitle.textContent = `Update information for ${member.name}`;
     const addressLabel = document.getElementById("addressLabel");
@@ -1414,6 +1602,7 @@ document.getElementById("memberForm").addEventListener("submit", function(e) {
       });
     }
   }
+  invalidateRelationIndex();
   closeModal();
   updateStats();
   uploadDataToServer();
@@ -1439,6 +1628,7 @@ function uploadDataToServer() {
   });
 }
 function deleteMember(path) {
+  invalidateRelationIndex();
   if (!confirm("Are you sure you want to delete this member and all their descendants?")) {
     return;
   }
@@ -1452,30 +1642,23 @@ function deleteMember(path) {
     const index = parseInt(match[2]);
     if (parent && parent[arrayName]) {
       parent[arrayName].splice(index, 1);
-      const memberCard = document.querySelector(`[data-path="${path}"]`);
-      if (memberCard) {
-        memberCard.remove();
-      }
-      const parentCard = document.querySelector(`[data-path="${parentPath}"]`);
-      if (parentCard) {
-        const sectionHeaders = parentCard.querySelectorAll(".section-title");
-        sectionHeaders.forEach((header) => {
-          const text = header.textContent;
-          if (arrayName === "spouses" && text.includes("Spouses")) {
-            header.textContent = `Spouses`;
-            header.setAttribute("mValue", parent.spouses.length);
-            const count = header.parentElement.querySelector(".section-count");
-            if (count) count.textContent = parent.spouses.length;
-          } else if (arrayName === "children" && text.includes("Children")) {
-            header.textContent = `Children`;
-            header.setAttribute("mValue", parent.children.length);
-            const count = header.parentElement.querySelector(".section-count");
-            if (count) count.textContent = parent.children.length;
-          }
-        });
-      }
+      const prefix = `${parentPath}.${arrayName}[`;
+      const shifted = {};
+      Object.keys(expandState).forEach((key) => {
+        const hit = key.startsWith(prefix) && key.slice(prefix.length).match(/^(\d+)\](.*)$/);
+        if (!hit) {
+          shifted[key] = expandState[key];
+          return;
+        }
+        const i = +hit[1];
+        if (i === index) return;
+        shifted[`${prefix}${i > index ? i - 1 : i}]${hit[2]}`] = expandState[key];
+      });
+      expandState = shifted;
     }
   }
+  renderTree();
+  if (currentView !== "tree") applyViewVisibility();
   updateStats();
   uploadDataToServer();
 }
@@ -1643,6 +1826,8 @@ window.expandAll = expandAll;
 window.collapseAll = collapseAll;
 window.exportJSON = exportJSON;
 window.setEditMode = setEditMode;
+window.openLinkModal = openLinkModal;
+window.closeLinkModal = closeLinkModal;
 window.importJSON = importJSON;
 window.onDBClick = onDBClick;
 window.navigateToPath = navigateToPath;
