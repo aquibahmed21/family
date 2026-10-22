@@ -1506,6 +1506,7 @@ textarea.form-control {
 .modal-footer {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 0.6rem;
   padding: 0.9rem 1.25rem 1.1rem;
   border-top: 1px solid var(--border-color);
@@ -1706,7 +1707,7 @@ textarea.form-control {
   display: none;
 }
 
-.container[role="writer"] .card-actions .btn:not(.btn-warning) {
+.container[role="writer"] .card-actions .btn:not(.btn-warning):not(.btn-link-rel) {
   display: none;
 }
 
@@ -2808,4 +2809,112 @@ textarea.form-control {
 
 .result-tag.life.deceased {
   color: var(--text-muted);
+}
+
+/* Sibling / cousin links */
+.member-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.member-links > i {
+  font-size: 0.7rem;
+}
+
+.link-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.link-chip {
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface-color);
+  color: var(--text-primary);
+  font: 500 0.78rem var(--font-body);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+
+.link-chip:hover {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+}
+
+.link-intro {
+  margin: 0 0 0.8rem;
+}
+
+.link-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+}
+
+.link-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.45rem 0.6rem;
+  background: var(--surface-color-2);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.link-type {
+  padding: 0.1rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(47, 111, 94, 0.18);
+  color: var(--primary-light);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.link-type.cousin {
+  background: rgba(201, 138, 52, 0.18);
+  color: var(--warning-color);
+}
+
+.link-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.link-name small {
+  color: var(--text-muted);
+}
+
+.link-remove {
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.link-remove:hover {
+  background: rgba(193, 85, 74, 0.16);
+  color: var(--danger-color);
+}
+
+.link-add {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.link-add .form-control {
+  flex: 1;
 }

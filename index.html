@@ -392,6 +392,42 @@
     </div>
   </div>
 
+  <!-- Link relatives modal -->
+  <div id="linkModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="linkTitle">
+    <div class="modal-content">
+      <div class="modal-header">
+        <span class="modal-avatar" aria-hidden="true"><i class="fas fa-people-arrows"></i></span>
+        <div class="modal-heading">
+          <h2 class="modal-title" id="linkTitle">Link relatives</h2>
+          <p class="modal-subtitle" id="linkSubtitle"></p>
+        </div>
+        <button type="button" class="modal-close" onclick="closeLinkModal()" title="Close" aria-label="Close"><i class="fas fa-times"></i></button>
+      </div>
+      <div class="modal-body">
+        <p class="form-hint link-intro">For families that cross branches: siblings who married into another branch, or cousins who married each other. Siblings of siblings are linked automatically.</p>
+
+        <h4 class="col-title">Linked now</h4>
+        <div id="linkList" class="link-list"></div>
+
+        <h4 class="col-title">Add a link</h4>
+        <div class="form-group">
+          <div class="seg">
+            <label class="seg-option" data-value="sibling"><input type="radio" name="linkType" value="sibling" checked><span><i class="fas fa-people-arrows"></i> Sibling</span></label>
+            <label class="seg-option" data-value="cousin"><input type="radio" name="linkType" value="cousin"><span><i class="fas fa-people-group"></i> Cousin</span></label>
+          </div>
+        </div>
+        <div class="link-add">
+          <input id="linkPerson" list="linkPeople" class="form-control" placeholder="Search name or #serial" autocomplete="off">
+          <button type="button" class="btn btn-primary" id="linkAddBtn"><i class="fas fa-plus"></i> Add</button>
+        </div>
+        <datalist id="linkPeople"></datalist>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" onclick="closeLinkModal()"><i class="fas fa-check"></i> Done</button>
+      </div>
+    </div>
+  </div>
+
   <button id="backToResultsBtn" class="back-results-btn" style="display:none;" title="Back to results"><i
       class="fas fa-arrow-left"></i> Back to results</button>
 
