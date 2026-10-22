@@ -13,8 +13,8 @@
   <!-- Font Awesome -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <!-- Stylesheet -->
-  <script type="module" crossorigin src="/family/assets/index-Cw-8oyt0.js"></script>
-  <link rel="stylesheet" crossorigin href="/family/assets/index-BCTEQazM.css">
+  <script type="module" crossorigin src="/family/assets/index-DCEoI0Hb.js"></script>
+  <link rel="stylesheet" crossorigin href="/family/assets/index-CJQht4tr.css">
 </head>
 
 <body>
@@ -213,6 +213,9 @@
       <div id="filterResults" class="results-list"></div>
     </div>
 
+    <!-- Pinned people: one-click shortcuts -->
+    <div class="pinned-bar" id="pinnedBar" hidden></div>
+
     <!-- Tree Container -->
     <div class="tree-container">
       <div id="loadingState" class="loading">
@@ -239,6 +242,13 @@
         <button type="button" class="modal-close" onclick="closeModal()" title="Close" aria-label="Close"><i class="fas fa-times"></i></button>
       </div>
 
+      <div class="spouse-source" id="spouseSource" hidden>
+        <div class="seg">
+          <label class="seg-option" data-value="new"><input type="radio" name="spouseSource" value="new" checked><span><i class="fas fa-user-plus"></i> New person</span></label>
+          <label class="seg-option" data-value="existing"><input type="radio" name="spouseSource" value="existing"><span><i class="fas fa-magnifying-glass"></i> Already in tree</span></label>
+        </div>
+      </div>
+
       <div class="modal-tabs" role="tablist">
         <button type="button" class="modal-tab active" role="tab" data-tab="basics"><i class="fas fa-id-card"></i> Basics</button>
         <button type="button" class="modal-tab" role="tab" data-tab="life"><i class="fas fa-heart-pulse"></i> Life</button>
@@ -247,6 +257,15 @@
 
       <div class="modal-body">
         <form id="memberForm">
+
+          <section class="form-panel" data-panel="existing">
+            <div class="form-group">
+              <label class="form-label">Search for the spouse</label>
+              <input type="text" id="existingSpouse" list="existingSpousePeople" class="form-control" placeholder="Name or #serial" autocomplete="off">
+              <datalist id="existingSpousePeople"></datalist>
+              <p class="form-hint">Use this when the spouse is already in the tree under their own family. Both people stay where they are; the marriage is recorded as a link and shown on both cards.</p>
+            </div>
+          </section>
 
           <section class="form-panel active" data-panel="basics">
             <div class="form-grid">
@@ -272,6 +291,12 @@
                   <span><i class="fas fa-venus"></i> Female</span>
                 </label>
               </div>
+            </div>
+
+            <div class="form-group" id="coParentGroup" hidden>
+              <label class="form-label">Other parent</label>
+              <select name="coParent" id="coParentSelect" class="form-control"><option value="">Not recorded</option></select>
+              <p class="form-hint">If this child belongs to both of them, pick the linked spouse. The child then shows under both parents.</p>
             </div>
 
             <div class="form-grid">
@@ -387,7 +412,7 @@
         <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
         <button type="submit" form="memberForm" class="btn btn-primary">
           <i class="fas fa-save"></i>
-          Save member
+          <span id="memberSaveLabel">Save member</span>
         </button>
       </div>
     </div>
@@ -413,6 +438,7 @@
         <h4 class="col-title">Add a link</h4>
         <div class="form-group">
           <div class="seg">
+            <label class="seg-option" data-value="spouse"><input type="radio" name="linkType" value="spouse"><span><i class="fas fa-ring"></i> Spouse</span></label>
             <label class="seg-option" data-value="sibling"><input type="radio" name="linkType" value="sibling" checked><span><i class="fas fa-people-arrows"></i> Sibling</span></label>
             <label class="seg-option" data-value="cousin"><input type="radio" name="linkType" value="cousin"><span><i class="fas fa-people-group"></i> Cousin</span></label>
           </div>
