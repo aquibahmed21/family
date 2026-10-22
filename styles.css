@@ -1061,23 +1061,70 @@ footer {
   margin-top: 0.2rem;
 }
 
-/* Icon-only actions, hidden until the card is hovered or focused (always shown on touch) */
-.card-actions {
+/* Icon-only tools, hidden until the card is hovered or focused (always shown on touch) */
+.card-tools {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.card-actions,
+.branch-actions {
   display: flex;
   gap: 0.25rem;
   flex-shrink: 0;
 }
 
 @media (hover: hover) {
-  .card-actions {
+  .card-tools {
     opacity: 0;
     transition: opacity 0.15s ease;
   }
 
-  .member-card:hover .card-actions,
-  .member-card:focus-within .card-actions {
+  .member-card:hover .card-tools,
+  .member-card:focus-within .card-tools {
     opacity: 1;
   }
+}
+
+.tool-btn {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--surface-color);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+
+.tool-btn:hover {
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+}
+
+.member-card.pinned .pin-btn {
+  background: rgba(192, 138, 62, 0.2);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.pinned-star {
+  display: none;
+  align-self: center;
+  color: var(--accent-color);
+  font-size: 0.72rem;
+  transform: rotate(35deg);
+}
+
+.member-card.pinned .pinned-star {
+  display: inline;
+}
+
+.container[role="reader"] .pin-btn {
+  display: none;
 }
 
 .card-actions .btn-sm {
@@ -1651,7 +1698,7 @@ textarea.form-control {
     font-size: 1.05rem;
   }
 
-  .card-actions {
+  .card-tools {
     width: 100%;
     justify-content: flex-end;
     padding-top: 0.5rem;
@@ -2917,4 +2964,130 @@ textarea.form-control {
 
 .link-add .form-control {
   flex: 1;
+}
+
+/* Add Spouse: new person vs. someone already in the tree */
+.spouse-source {
+  margin: 0 1.25rem 0.75rem;
+}
+
+.spouse-source[hidden],
+.modal-tabs[hidden] {
+  display: none;
+}
+
+.link-type.spouse {
+  background: rgba(192, 106, 134, 0.18);
+  color: var(--female-color);
+}
+
+/* A spouse who lives in another branch, shown inside the Spouses group */
+.linked-card {
+  border-style: dashed;
+}
+
+.linked-badge {
+  align-self: center;
+  padding: 0.05rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(192, 106, 134, 0.16);
+  color: var(--female-color);
+  font: 600 0.68rem var(--font-body);
+}
+
+.linked-badge i {
+  margin-right: 0.25rem;
+  font-size: 0.6rem;
+}
+
+.container[data-edit] .linked-card .detail-item.chip-editable {
+  cursor: default;
+  border-style: solid;
+  border-color: var(--border-color);
+}
+
+.container[data-edit] .linked-card .name {
+  cursor: default;
+  border-bottom: none;
+}
+
+.container[data-edit] .linked-card .name:hover {
+  background: none;
+}
+
+.container[data-edit] .linked-card .detail-item.chip-editable::after {
+  content: none;
+}
+
+/* Pinned people bar */
+.pinned-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius);
+}
+
+.pinned-bar[hidden] {
+  display: none;
+}
+
+.pinned-label {
+  margin-right: 0.2rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent-color);
+}
+
+.pin-chip {
+  --accent: var(--male-color);
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  background: var(--surface-color-2);
+  transition: border-color 0.15s ease;
+}
+
+.pin-chip.female {
+  --accent: var(--female-color);
+}
+
+.pin-chip:hover {
+  border-color: var(--accent);
+}
+
+.pin-go {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.2rem 0.3rem 0.2rem 0.25rem;
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: 500 0.85rem var(--font-body);
+  cursor: pointer;
+}
+
+.pin-x {
+  width: 24px;
+  height: 24px;
+  margin-right: 0.15rem;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  cursor: pointer;
+}
+
+.pin-x:hover {
+  background: rgba(193, 85, 74, 0.16);
+  color: var(--danger-color);
 }

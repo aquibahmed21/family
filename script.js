@@ -55,6 +55,7 @@ const VIEW_PANES = {
 
 function applyViewVisibility()
 {
+  queueMicrotask(renderPinnedBar);
   document.querySelectorAll('.view-btn').forEach(btn =>
   {
     const active = btn.dataset.view === currentView;
@@ -376,16 +377,29 @@ function buildRelationGraph(role)
 
   // Cross-family links become extra edges in the graph
   const idx = getRelationIndex();
-  ['sibling', 'cousin'].forEach(type => idx.edges[type].forEach((others, serial) =>
+  ['spouse', 'sibling', 'cousin'].forEach(type => idx.edges[type].forEach((others, serial) =>
   {
     const a = idx.bySerial.get(serial);
     if (!a || !nodes.has(a.path)) return;
     others.forEach(o =>
     {
       const b = idx.bySerial.get(o);
-      if (b && nodes.has(b.path)) nodes.get(a.path)[type].push(b.path);
+      if (b && nodes.has(b.path) && !nodes.get(a.path)[type].includes(b.path)) nodes.get(a.path)[type].push(b.path);
     });
   }));
+  // A child shared with another parent hangs off both of them
+  idx.coChildren.forEach((kids, parentSerial) =>
+  {
+    const parent = idx.bySerial.get(parentSerial);
+    if (!parent || !nodes.has(parent.path)) return;
+    kids.forEach(k =>
+    {
+      const child = idx.bySerial.get(k);
+      if (!child || !nodes.has(child.path)) return;
+      nodes.get(child.path).up.push(parent.path);
+      nodes.get(parent.path).down.push(child.path);
+    });
+  });
   return nodes;
 }
 
@@ -765,6 +779,7 @@ function loadFamilyTree()
 function renderTree()
 {
   invalidateRelationIndex();
+  queueMicrotask(renderPinnedBar);
   if (!data || !data.rootPerson) return;
 
   document.getElementById('familyName').textContent = data.familyName || 'Family Tree';
@@ -827,8 +842,8 @@ function collectMembers()
       serial: member.serial || null,
       gender: member.gender || '',
       maritalStatus: member.maritalStatus || '',
-      spousesCount: (member.spouses && member.spouses.length) || 0,
-      childrenCount: (member.children && member.children.length) || 0,
+      spousesCount: ((member.spouses && member.spouses.length) || 0) + linkedRelatives(member, 'spouse', role).length,
+      childrenCount: ((member.children && member.children.length) || 0) + linkedChildren(member, role).length,
       privacy: member.privacy || 'public',
       dob: member.dob || '',
       dod: member.dod || '',
@@ -838,8 +853,9 @@ function collectMembers()
       // Relatives, so a result can be recognised without opening it
       relation,
       ownerName: visible(owner) && owner.name || '',
-      spouseNames: names(member.spouses),
-      childNames: names(member.children),
+      spouseNames: [...names(member.spouses), ...linkedRelatives(member, 'spouse', role).map(r => r.name).filter(Boolean)],
+      childNames: [...names(member.children), ...linkedChildren(member, role).map(r => r.name).filter(Boolean)],
+      coParentName: (coParentOf(member, role) || {}).name || '',
       siblingNames: linkedRelatives(member, 'sibling', role).map(r => r.name).filter(Boolean),
       cousinNames: linkedRelatives(member, 'cousin', role).map(r => r.name).filter(Boolean),
       path
@@ -866,7 +882,7 @@ function relationLines(m)
     const label = m.relation === 'child'
       ? (m.gender === 'Female' ? 'Daughter of' : m.gender === 'Male' ? 'Son of' : 'Child of')
       : (m.gender === 'Female' ? 'Wife of' : m.gender === 'Male' ? 'Husband of' : 'Spouse of');
-    lines.push({ icon: m.relation === 'child' ? 'fa-child' : 'fa-ring', text: `${label} <b>${m.ownerName}</b>` });
+    lines.push({ icon: m.relation === 'child' ? 'fa-child' : 'fa-ring', text: `${label} <b>${m.ownerName}</b>${m.coParentName ? ` &amp; <b>${m.coParentName}</b>` : ''}` });
   }
   const list = (arr) => arr.length > 3 ? `${arr.slice(0, 3).join(', ')} +${arr.length - 3}` : arr.join(', ');
   if (m.spouseNames.length) lines.push({ icon: 'fa-ring', text: `Spouse: <b>${list(m.spouseNames)}</b>` });
@@ -1150,9 +1166,10 @@ async function navigateToPath(path)
 }
 
 // ---------- Sibling / cousin links: relations the tree structure cannot express ----------
-// Stored as member.links = [{ type: 'sibling' | 'cousin', serial }] on whichever person the link
+// Stored as member.links = [{ type: 'spouse' | 'sibling' | 'cousin', serial }] on whichever person the link
 // was created from; every lookup reads it in both directions, and sibling groups are transitive.
-const LINK_TYPES = { sibling: 'Sibling', cousin: 'Cousin' };
+const LINK_TYPES = { spouse: 'Spouse', sibling: 'Sibling', cousin: 'Cousin' };
+const LINK_ICONS = { spouse: 'fa-ring', sibling: 'fa-people-arrows', cousin: 'fa-people-group' };
 let relationIndexCache = null;
 
 function invalidateRelationIndex()
@@ -1172,7 +1189,7 @@ function getRelationIndex()
     (m.children || []).forEach((c, i) => walk(c, `${path}.children[${i}]`));
   })(data && data.rootPerson, 'root');
 
-  const edges = { sibling: new Map(), cousin: new Map() };
+  const edges = { spouse: new Map(), sibling: new Map(), cousin: new Map() };
   const connect = (type, a, b) =>
   {
     // Links to people who were since deleted are simply ignored
@@ -1204,7 +1221,17 @@ function getRelationIndex()
     group.forEach(s => { seen.add(s); sib.set(s, new Set([...group].filter(x => x !== s))); });
   });
 
-  relationIndexCache = { bySerial, edges };
+  // Children who belong to two parents: stored under one, pointed at the other via member.coParent
+  const coChildren = new Map();
+  bySerial.forEach(({ member }, serial) =>
+  {
+    const cp = member.coParent;
+    if (cp == null || cp === serial || !bySerial.has(cp)) return;
+    if (!coChildren.has(cp)) coChildren.set(cp, []);
+    coChildren.get(cp).push(serial);
+  });
+
+  relationIndexCache = { bySerial, edges, coChildren };
   return relationIndexCache;
 }
 
@@ -1219,14 +1246,38 @@ function linkedRelatives(member, type, role = getCurrentRole())
     .map(r => ({ serial: r.serial, name: r.member.name || '', path: r.path, member: r.member }));
 }
 
+// Children recorded under their other parent but also belonging to this member
+function linkedChildren(member, role = getCurrentRole())
+{
+  if (!data || member.serial == null) return [];
+  const idx = getRelationIndex();
+  return (idx.coChildren.get(member.serial) || [])
+    .map(serial => ({ serial, ...idx.bySerial.get(serial) }))
+    .filter(r => r.member && canSee(r.member, role))
+    .map(r => ({ serial: r.serial, name: r.member.name || '', path: r.path, member: r.member }));
+}
+
+// The other parent of a child, when one is recorded and visible
+function coParentOf(member, role = getCurrentRole())
+{
+  if (!data || member.coParent == null) return null;
+  const hit = getRelationIndex().bySerial.get(member.coParent);
+  return hit && hit.member !== member && canSee(hit.member, role) ? { serial: member.coParent, name: hit.member.name || '', path: hit.path } : null;
+}
+
 function relativeLinksHTML(member)
 {
   if (getCurrentRole() === 'reader') return '';
-  return ['sibling', 'cousin'].map(type =>
+  const other = coParentOf(member);
+  const otherParentRow = other
+    ? `<div class="member-links other-parent"><i class="fas fa-user-group"></i><span class="link-label">Other parent</span>
+        <button type="button" class="link-chip" data-serial="${other.serial}">${other.name || 'Unnamed'}</button></div>`
+    : '';
+  return otherParentRow + ['sibling', 'cousin'].map(type =>
   {
     const list = linkedRelatives(member, type);
     if (!list.length) return '';
-    return `<div class="member-links"><i class="fas fa-people-arrows"></i>
+    return `<div class="member-links"><i class="fas ${LINK_ICONS[type]}"></i>
       <span class="link-label">${LINK_TYPES[type]}${list.length > 1 ? 's' : ''}</span>
       ${list.map(r => `<button type="button" class="link-chip" data-serial="${r.serial}">${r.name || 'Unnamed'}</button>`).join('')}</div>`;
   }).join('');
@@ -1376,6 +1427,79 @@ document.addEventListener('click', (e) =>
   const hit = getRelationIndex().bySerial.get(+chip.dataset.serial);
   if (hit) navigateToPath(hit.path);
 });
+
+// ---------- Pinned people: personal shortcuts kept in this browser ----------
+function readPins()
+{
+  try { return JSON.parse(localStorage.getItem('pinnedPeople')) || []; } catch (e) { return []; }
+}
+
+function isPinned(serial)
+{
+  return readPins().includes(serial);
+}
+
+function togglePin(serial)
+{
+  const pins = readPins();
+  const next = pins.includes(serial) ? pins.filter(s => s !== serial) : [...pins, serial];
+  try { localStorage.setItem('pinnedPeople', JSON.stringify(next)); } catch (e) { /* private mode: pins last for this page only */ }
+  document.querySelectorAll(`.member-card[data-serial="${serial}"]`).forEach(c => c.classList.toggle('pinned', next.includes(serial)));
+  renderPinnedBar();
+}
+
+function renderPinnedBar()
+{
+  const bar = document.getElementById('pinnedBar');
+  if (!bar) return;
+  const role = getCurrentRole();
+  const idx = data && data.rootPerson ? getRelationIndex() : null;
+  const people = role === 'reader' || !idx ? [] : readPins()
+    .map(serial => ({ serial, ...idx.bySerial.get(serial) }))
+    .filter(p => p.member && canSee(p.member, role));
+
+  bar.hidden = !people.length;
+  bar.innerHTML = people.length ? `<span class="pinned-label"><i class="fas fa-thumbtack"></i> Pinned</span>
+    ${people.map(p => `<span class="pin-chip ${p.member.gender === 'Female' ? 'female' : 'male'}">
+      <button type="button" class="pin-go" data-serial="${p.serial}" title="Go to ${p.member.name || 'this person'}">
+        <span class="mini-avatar">${(p.member.name || '?').trim().charAt(0).toUpperCase()}</span>${p.member.name || 'Unnamed'}</button>
+      <button type="button" class="pin-x" data-pin="${p.serial}" title="Unpin" aria-label="Unpin"><i class="fas fa-times"></i></button></span>`).join('')}` : '';
+}
+
+async function goToPinned(serial)
+{
+  const hit = getRelationIndex().bySerial.get(serial);
+  if (!hit) return;
+  if (currentView !== 'tree') setView('tree');
+  await navigateToPath(hit.path);
+  // Not arriving from search results, so there is nothing to go "back" to
+  const back = document.getElementById('backToResultsBtn');
+  if (back) back.style.display = 'none';
+}
+
+document.getElementById('pinnedBar')?.addEventListener('click', (e) =>
+{
+  const go = e.target.closest('.pin-go');
+  if (go) goToPinned(+go.dataset.serial);
+  const x = e.target.closest('.pin-x');
+  if (x) togglePin(+x.dataset.pin);
+});
+
+// Expand or collapse every spouses / children group beneath one person, and redraw just that person
+function setBranchExpanded(path, open)
+{
+  const root = safeGetByPath(path);
+  if (!root) return;
+  (function walk(m, p)
+  {
+    if (sectionCount(m, 'spouses') > 0) expandState[`${p}.spouses`] = open;
+    if (sectionCount(m, 'children') > 0) expandState[`${p}.children`] = open;
+    (m.spouses || []).forEach((s, i) => walk(s, `${p}.spouses[${i}]`));
+    (m.children || []).forEach((c, i) => walk(c, `${p}.children[${i}]`));
+  })(root, path);
+  const old = document.querySelector(`.member-node[data-path="${path}"]`);
+  if (old) old.replaceWith(renderMember(root, null, path, 0));
+}
 
 // ---------- Edit mode: change status chips in place ----------
 const PRIVACY_LABELS = { public: 'Public', protected: 'Protected', private: 'Private' };
@@ -1553,14 +1677,14 @@ document.addEventListener('click', (e) =>
 {
   const chip = e.target.closest('.chip-editable');
   const container = document.querySelector('.container');
-  const nameEl = e.target.closest('.member-card .name');
+  const nameEl = e.target.closest('.member-card:not(.linked-card) .name');
   if (nameEl && container?.hasAttribute('data-edit') && canEditInline())
   {
     closeChipMenu();
     startNameEdit(nameEl);
     return;
   }
-  if (chip && container?.hasAttribute('data-edit') && canEditInline())
+  if (chip && !chip.closest('.linked-card') && container?.hasAttribute('data-edit') && canEditInline())
   {
     e.stopPropagation();
     openChipMenu(chip);
@@ -1577,7 +1701,7 @@ document.addEventListener('keydown', (e) =>
 window.addEventListener('scroll', closeChipMenu, true);
 
 // Render individual family member
-function renderMember(member, parent, path, level)
+function renderMember(member, parent, path, level, cardOnly = false)
 {
   const node = document.createElement('div');
   node.className = 'member-node';
@@ -1630,6 +1754,8 @@ function renderMember(member, parent, path, level)
         </div>
       `).join('');
 
+  const hasBranch = sectionCount(member, 'spouses') > 0 || sectionCount(member, 'children') > 0;
+
   // Main card content
   card.innerHTML = `
         <div class="card-header">
@@ -1644,6 +1770,7 @@ function renderMember(member, parent, path, level)
               <span class="name${member.name ? '' : ' name-empty'}">${member.name || ''}</span>
               ${member.alternateName ? `<span class="alternate-name">(${member.alternateName})</span>` : ''}
               <span class="serial-badge">#${member.serial || 'N/A'}</span>
+              <i class="fas fa-thumbtack pinned-star" title="Pinned"></i>
             </div>
             <div class="member-details">
               ${detailsHTML}
@@ -1651,6 +1778,12 @@ function renderMember(member, parent, path, level)
             ${relativeLinksHTML(member)}
             ${member.address ? `<div class="member-address"><i class="fas fa-map-marker-alt"></i> ${member.address}</div>` : ''}
             ${member.notes ? `<div class="member-notes"><i class="fas fa-quote-left"></i> ${member.notes}</div>` : ''}
+          </div>
+          <div class="card-tools">
+          <div class="branch-actions">
+            ${member.serial != null ? `<button type="button" class="tool-btn pin-btn" onclick="togglePin(${member.serial})" title="Pin to the top" aria-label="Pin to the top"><i class="fas fa-thumbtack"></i></button>` : ''}
+            ${hasBranch ? `<button type="button" class="tool-btn" onclick="setBranchExpanded('${path}', true)" title="Expand all spouses and children below" aria-label="Expand everything below"><i class="fas fa-angles-down"></i></button>
+            <button type="button" class="tool-btn" onclick="setBranchExpanded('${path}', false)" title="Collapse all spouses and children below" aria-label="Collapse everything below"><i class="fas fa-angles-up"></i></button>` : ''}
           </div>
           <div class="card-actions">
             <button class="btn btn-success btn-sm" onclick="showModal('spouse', '${path}')" title="Add Spouse" aria-label="Add Spouse">
@@ -1667,27 +1800,126 @@ function renderMember(member, parent, path, level)
             </button>
             ${path !== 'root' ? `<button class="btn btn-danger btn-sm" onclick="deleteMember('${path}')" title="Delete" aria-label="Delete"><i class="fas fa-trash"></i><span class="btn-label">Delete</span></button>` : ''}
           </div>
+          </div>
         </div>
       `;
+  if (member.serial != null)
+  {
+    card.dataset.serial = member.serial;
+    if (isPinned(member.serial)) card.classList.add('pinned');
+  }
 
   card.setAttribute("privacy", member.privacy || "public");
   node.appendChild(card);
 
-  // Add spouses section
-  if (member.spouses && member.spouses.length > 0)
+  if (cardOnly) return node;
+
+  // Add spouses section (nested spouses plus anyone linked in from another branch)
+  if (sectionCount(member, 'spouses') > 0)
   {
     const spousesSection = createSection('spouses', path, member, 'Spouses', 'ring', level);
     node.appendChild(spousesSection);
   }
 
   // Add children section
-  if (member.children && member.children.length > 0)
+  if (sectionCount(member, 'children') > 0)
   {
     const childrenSection = createSection('children', path, member, 'Children', 'users', level);
     node.appendChild(childrenSection);
   }
 
   return node;
+}
+
+// How many entries a Spouses / Children section holds, counting spouses linked in from another branch
+function sectionCount(member, type)
+{
+  const linked = type === 'spouses' ? linkedRelatives(member, 'spouse').length : linkedChildren(member).length;
+  return ((member[type] && member[type].length) || 0) + linked;
+}
+
+// Everything shown inside a Spouses / Children section
+function renderSectionItems(member, memberPath, type, level)
+{
+  const items = (member[type] || []).map((item, i) => renderMember(item, member, `${memberPath}.${type}[${i}]`, level));
+  if (type === 'spouses')
+  {
+    linkedRelatives(member, 'spouse').forEach(rel => items.push(
+      renderLinkedCard(memberPath, rel, `unlinkSpouse(${member.serial}, ${rel.serial})`, 'Remove spouse link')));
+  }
+  else
+  {
+    linkedChildren(member).forEach(rel => items.push(
+      renderLinkedCard(memberPath, rel, `unlinkCoParent(${rel.serial})`, 'Remove this parent link')));
+  }
+  return items;
+}
+
+// Someone who lives elsewhere in the tree (a linked spouse, or a child shared with another parent):
+// a card-only copy that points back to their real place
+function renderLinkedCard(ownerPath, rel, unlinkCall, unlinkTitle)
+{
+  const card = renderMember(rel.member, null, rel.path, 0, true).querySelector('.member-card');
+  const fakePath = `${ownerPath}~link${rel.serial}`;
+  card.dataset.path = fakePath;
+  card.dataset.linkedPath = rel.path;
+  card.classList.add('linked-card');
+  card.querySelector('.branch-actions')?.remove();
+  card.querySelector('.card-actions').innerHTML = `
+    <button class="btn btn-primary btn-sm btn-link-rel" onclick="navigateToPath('${rel.path}')" title="Open in their own family" aria-label="Open in their own family">
+      <i class="fas fa-arrow-up-right-from-square"></i></button>
+    <button class="btn btn-warning btn-sm btn-link-rel" onclick="${unlinkCall}" title="${unlinkTitle}" aria-label="${unlinkTitle}">
+      <i class="fas fa-link-slash"></i></button>`;
+  // Seen from the other parent, the child's "other parent" is that very person; name the parent it is recorded under instead
+  const otherParentRow = card.querySelector('.other-parent');
+  if (otherParentRow)
+  {
+    const real = safeGetByPath(rel.path.replace(/\.(children|spouses)\[\d+\]$/, ''));
+    if (real && real.serial != null && canSee(real))
+    {
+      otherParentRow.querySelector('.link-label').textContent = 'Parent';
+      const chip = otherParentRow.querySelector('.link-chip');
+      chip.dataset.serial = real.serial;
+      chip.textContent = real.name || 'Unnamed';
+    }
+    else otherParentRow.remove();
+  }
+  card.querySelector('.member-name').insertAdjacentHTML('beforeend',
+    '<span class="linked-badge" title="Lives in another branch of the tree"><i class="fas fa-link"></i> linked</span>');
+  const node = document.createElement('div');
+  node.className = 'member-node linked-node';
+  node.dataset.path = fakePath;
+  node.appendChild(card);
+  return node;
+}
+
+function unlinkCoParent(childSerial)
+{
+  if (!confirm('Remove this parent link? The child stays under their other parent.')) return;
+  const hit = getRelationIndex().bySerial.get(childSerial);
+  if (!hit) return;
+  delete hit.member.coParent;
+  invalidateRelationIndex();
+  renderTree();
+  if (currentView !== 'tree') applyViewVisibility();
+  updateStats();
+  uploadDataToServer();
+}
+
+function unlinkSpouse(a, b)
+{
+  if (!confirm('Remove this spouse link? Both people stay in the tree.')) return;
+  const link = directLinks(a).find(l => l.type === 'spouse' && l.other === b);
+  if (!link) return;
+  const holder = getRelationIndex().bySerial.get(link.owner).member;
+  const target = link.owner === a ? b : a;
+  holder.links = (holder.links || []).filter(l => !(l.type === 'spouse' && l.serial === target));
+  if (!holder.links.length) delete holder.links;
+  invalidateRelationIndex();
+  renderTree();
+  if (currentView !== 'tree') applyViewVisibility();
+  updateStats();
+  uploadDataToServer();
 }
 
 // Create expandable section (spouses/children)
@@ -1706,8 +1938,8 @@ function createSection(type, path, member, title, icon, level)
           <i class="fas fa-chevron-right"></i>
         </button>
         <i class="fas fa-${icon}"></i>
-        <span class="section-title" mValue="${member[type].length}">${title}</span>
-        <span class="section-count">${member[type].length}</span>
+        <span class="section-title" mValue="${sectionCount(member, type)}">${title}</span>
+        <span class="section-count">${sectionCount(member, type)}</span>
       `;
 
   sectionHeader.onclick = () => toggleSection(sectionPath);
@@ -1718,11 +1950,7 @@ function createSection(type, path, member, title, icon, level)
 
   if (isExp)
   {
-    member[type].forEach((item, i) =>
-    {
-      const itemElement = renderMember(item, member, `${path}.${type}[${i}]`, level + 1);
-      sectionContent.appendChild(itemElement);
-    });
+    renderSectionItems(member, path, type, level + 1).forEach(el => sectionContent.appendChild(el));
   }
 
   section.appendChild(sectionHeader);
@@ -1759,15 +1987,7 @@ function toggleSection(sectionPath)
 
     // Clear and render items
     sectionContent.innerHTML = '';
-    if (member[type] && member[type].length > 0)
-    {
-      const level = pathParts.length - 1;
-      member[type].forEach((item, i) =>
-      {
-        const itemElement = renderMember(item, member, `${memberPath}.${type}[${i}]`, level);
-        sectionContent.appendChild(itemElement);
-      });
-    }
+    renderSectionItems(member, memberPath, type, pathParts.length - 1).forEach(el => sectionContent.appendChild(el));
   } else
   {
     // Collapsing
@@ -1826,18 +2046,18 @@ function collapseAll()
   function setAllCollapsed(obj, currentPath)
   {
     if (!obj) return;
-    if (obj.spouses && obj.spouses.length > 0)
+    if (sectionCount(obj, 'spouses') > 0)
     {
       expandState[currentPath + '.spouses'] = false;
-      obj.spouses.forEach((spouse, i) =>
+      (obj.spouses || []).forEach((spouse, i) =>
       {
         setAllCollapsed(spouse, currentPath + `.spouses[${i}]`);
       });
     }
-    if (obj.children && obj.children.length > 0)
+    if (sectionCount(obj, 'children') > 0)
     {
       expandState[currentPath + '.children'] = false;
-      obj.children.forEach((child, i) =>
+      (obj.children || []).forEach((child, i) =>
       {
         setAllCollapsed(child, currentPath + `.children[${i}]`);
       });
@@ -1885,12 +2105,32 @@ function syncModalPreview()
   form.addEventListener('input', syncModalPreview);
   form.addEventListener('change', syncModalPreview);
   // A required field on a hidden tab would otherwise block submit silently
-  form.addEventListener('invalid', () => setModalTab('basics'), true);
+  form.addEventListener('invalid', () =>
+  {
+    if (form.dataset.source !== 'existing') setModalTab('basics');
+  }, true);
   document.getElementById('modal').addEventListener('mousedown', (e) =>
   {
     if (e.target.id === 'modal') closeModal();
   });
 })();
+
+// "Other parent" choices for a child: the owner's linked spouses
+function prepareCoParent(type, path)
+{
+  const group = document.getElementById('coParentGroup');
+  const select = document.getElementById('coParentSelect');
+  let owner = null;
+  if (type === 'child') owner = safeGetByPath(path);
+  else if (type === 'edit' && /\.children\[\d+\]$/.test(path)) owner = safeGetByPath(path.replace(/\.children\[\d+\]$/, ''));
+
+  const spouses = owner ? linkedRelatives(owner, 'spouse') : [];
+  select.innerHTML = '<option value="">Not recorded</option>'
+    + spouses.map(s => `<option value="${s.serial}">${(s.name || 'Unnamed').replace(/"/g, '')} #${s.serial}</option>`).join('');
+  group.hidden = !spouses.length;
+  // With exactly one linked spouse, a new child most likely belongs to both
+  if (type === 'child' && spouses.length === 1) select.value = String(spouses[0].serial);
+}
 
 function showModal(type, path)
 {
@@ -1901,6 +2141,7 @@ function showModal(type, path)
 
   // Reset form
   form.reset();
+  prepareCoParent(type, path);
 
   let member = {};
   if (type === 'edit')
@@ -1950,6 +2191,7 @@ function showModal(type, path)
   form.dataset.type = type;
   form.dataset.path = path;
   setModalTab('basics');
+  prepareSpouseSource(type, path);
   syncModalPreview();
 
   modal.classList.add('show');
@@ -1966,10 +2208,87 @@ function closeModal()
   document.getElementById('modal').classList.remove('show');
 }
 
+// ---------- Add Spouse: pick someone already in the tree ----------
+function setSpouseSource(mode)
+{
+  const form = document.getElementById('memberForm');
+  const existing = mode === 'existing';
+  form.dataset.source = mode;
+  document.getElementById('spouseSource').querySelectorAll('input').forEach(i => { i.checked = i.value === mode; });
+  document.querySelector('.modal-tabs').hidden = existing;
+  document.querySelectorAll('.form-panel').forEach(p => p.classList.remove('active'));
+  if (existing) document.querySelector('.form-panel[data-panel="existing"]').classList.add('active');
+  else setModalTab('basics');
+  // A hidden required field would silently block submitting the other mode
+  form.elements.name.required = !existing;
+  document.getElementById('memberSaveLabel').textContent = existing ? 'Link spouse' : 'Save member';
+  if (existing) document.getElementById('existingSpouse').focus();
+}
+
+function prepareSpouseSource(type, path)
+{
+  const isSpouse = type === 'spouse';
+  document.getElementById('spouseSource').hidden = !isSpouse;
+  if (!isSpouse)
+  {
+    setSpouseSource('new');
+    return;
+  }
+  const self = getByPath(path);
+  const role = getCurrentRole();
+  document.getElementById('existingSpousePeople').innerHTML = [...getRelationIndex().bySerial.values()]
+    .filter(r => r.member !== self && canSee(r.member, role))
+    .map(r => `<option value="${`${r.member.name || 'Unnamed'} #${r.member.serial}`.replace(/"/g, '')}"></option>`).join('');
+  document.getElementById('existingSpouse').value = '';
+  setSpouseSource('new');
+}
+
+// Records the marriage as a link, leaving both people where they are in the tree
+function addExistingSpouse(path)
+{
+  const me = getByPath(path);
+  const input = document.getElementById('existingSpouse');
+  const match = input.value.match(/#(\d+)\s*$/);
+  const other = match && getRelationIndex().bySerial.get(+match[1]);
+  const complain = (msg) =>
+  {
+    input.setCustomValidity(msg);
+    input.reportValidity();
+    input.setCustomValidity('');
+  };
+  if (!me || me.serial == null) return complain('This member has no serial number yet');
+  if (!other || other.member === me) return complain('Pick someone from the list');
+
+  const idx = getRelationIndex();
+  const alreadyLinked = directLinks(me.serial).some(l => l.type === 'spouse' && l.other === other.member.serial);
+  const alreadyNested = (me.spouses || []).includes(other.member) || (other.member.spouses || []).includes(me);
+  if (alreadyLinked || alreadyNested) return complain('They are already recorded as spouses');
+
+  me.links = me.links || [];
+  me.links.push({ type: 'spouse', serial: other.member.serial });
+  invalidateRelationIndex();
+  closeModal();
+  renderTree();
+  if (currentView !== 'tree') applyViewVisibility();
+  updateStats();
+  uploadDataToServer();
+}
+
+document.getElementById('spouseSource').addEventListener('change', (e) =>
+{
+  if (e.target.name === 'spouseSource') setSpouseSource(e.target.value);
+});
+
 // Handle form submission
 document.getElementById('memberForm').addEventListener('submit', function (e)
 {
   e.preventDefault();
+
+  if (this.dataset.type === 'spouse' && this.dataset.source === 'existing')
+  {
+    addExistingSpouse(this.dataset.path);
+    return;
+  }
 
   const formData = new FormData(this);
   const memberData = {};
@@ -1985,12 +2304,17 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
 
   const type = this.dataset.type;
   const path = this.dataset.path;
+  if (memberData.coParent) memberData.coParent = +memberData.coParent;
+  let rebuildForCoParent = !!memberData.coParent;
 
   if (type === 'edit')
   {
     // Edit existing member
     const member = getByPath(path);
+    rebuildForCoParent = rebuildForCoParent || member.coParent != null;
     Object.assign(member, memberData);
+    // An empty choice means "no other parent", which the blank-skipping loop above cannot express
+    if (!memberData.coParent && !document.getElementById('coParentGroup').hidden) delete member.coParent;
 
     // Re-render just this member card
     const memberCard = document.querySelector(`[data-path="${path}"]`);
@@ -2065,9 +2389,9 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
         if (type === 'spouse' && text.includes('Spouses'))
         {
           header.textContent = `Spouses`;
-          header.setAttribute("mValue", parent.spouses.length);
+          header.setAttribute("mValue", sectionCount(parent, 'spouses'));
           const count = header.parentElement.querySelector('.section-count');
-          if (count) count.textContent = parent.spouses.length;
+          if (count) count.textContent = sectionCount(parent, 'spouses');
         } else if (type === 'child' && text.includes('Children'))
         {
           header.textContent = `Children`;
@@ -2081,6 +2405,8 @@ document.getElementById('memberForm').addEventListener('submit', function (e)
 
   invalidateRelationIndex();
   closeModal();
+  // The shared child also has to appear under the other parent
+  if (rebuildForCoParent) renderTree();
   updateStats();
   uploadDataToServer();
 });
@@ -2401,6 +2727,10 @@ window.collapseAll = collapseAll;
 window.exportJSON = exportJSON;
 window.setEditMode = setEditMode;
 window.openLinkModal = openLinkModal;
+window.unlinkSpouse = unlinkSpouse;
+window.togglePin = togglePin;
+window.setBranchExpanded = setBranchExpanded;
+window.unlinkCoParent = unlinkCoParent;
 window.closeLinkModal = closeLinkModal;
 window.importJSON = importJSON;
 window.onDBClick = onDBClick;
