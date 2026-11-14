@@ -1,70 +1,29 @@
+import { ensureLogin, serverFetch, familyPath, localKey, currentFamily, canWrite, uiRole, mountAccountUI, openFamilies, getSession } from './session.js';
+
 // Global variables
 let data = null;
 let expandState = {};
 let currentView = localStorage.getItem('view') || 'tree';
 if (currentView === 'families') currentView = 'relations'; // renamed view
 
-// ---- Server address -------------------------------------------------------------------------
-// The server runs on a phone behind a Cloudflare quick tunnel whose address changes. A static
-// pointer file always holds the current one, so it is looked up here instead of being hard-coded.
-const POINTER_URL = 'https://aquibahmed21.github.io/server/server-url.json';
-const FAMILY_ID = (() =>
-{
-  // ?family=sharma picks another family; the choice is remembered. Default: "default".
-  const asked = new URLSearchParams(location.search).get('family');
-  try { if (asked) localStorage.setItem('familyId', asked.toLowerCase()); } catch (e) { /* storage blocked */ }
-  let id = asked || (() => { try { return localStorage.getItem('familyId'); } catch (e) { return null; } })() || 'default';
-  id = String(id).toLowerCase();
-  return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id) && id !== 'photos' ? id : 'default';
-})();
-let serverBase = null;
-
-async function resolveServer(force)
-{
-  if (!force && serverBase) return serverBase;
-  if (!force)
-  {
-    try { serverBase = sessionStorage.getItem('serverBase'); } catch (e) { /* ignore */ }
-    if (serverBase) return serverBase;
-  }
-  const r = await fetch(POINTER_URL + '?t=' + Date.now(), { cache: 'no-store' });
-  if (!r.ok) throw new Error('Could not find the server (pointer HTTP ' + r.status + ')');
-  const p = await r.json();
-  if (!p.server_url) throw new Error('The server is offline right now');
-  serverBase = String(p.server_url).replace(/\/+$/, '');
-  try { sessionStorage.setItem('serverBase', serverBase); } catch (e) { /* ignore */ }
-  return serverBase;
-}
-
-/** fetch() against the current server; if it is unreachable, look the address up again once. */
-async function serverFetch(path, options)
-{
-  const attempt = async force =>
-  {
-    const base = await resolveServer(force);
-    const res = await fetch(base + path, options);
-    // Cloudflare answers 530/502/404-html when the old tunnel address is gone
-    if (res.status === 530 || res.status === 502) throw new Error('tunnel ' + res.status);
-    return res;
-  };
-  try { return await attempt(false); }
-  catch (e) { return await attempt(true); }
-}
-const familyPath = '/family/' + FAMILY_ID;
-// The default family keeps the old cache key, so nothing already saved in the browser is lost.
-const localKey = FAMILY_ID === 'default' ? 'familyTreeData' : 'familyTreeData:' + FAMILY_ID;
-
 // Initialize the application
-document.addEventListener('DOMContentLoaded', function ()
+document.addEventListener('DOMContentLoaded', async function ()
 {
-  const role = localStorage.getItem("role") || "reader";
-  document.querySelector(".container").setAttribute("role", role);
   document.querySelector(".container").setAttribute("data-view", currentView);
-
-  loadFamilyTree();
-
   // Wire up search and filters once DOM is ready
   setupSearchAndFilters();
+
+  await ensureLogin();           // shows the sign-in dialog until somebody is signed in
+  mountAccountUI();
+  if (getSession().role === 'root' && !currentFamily())
+  {
+    // Root has no family of its own: pick one (or create the first)
+    document.getElementById('loadingState').style.display = 'none';
+    openFamilies(true);
+    return;
+  }
+  document.querySelector(".container").setAttribute("role", uiRole());
+  loadFamilyTree();
 });
 
 function getCurrentRole()
@@ -794,7 +753,7 @@ function loadFamilyTree()
     collapseAll();
     document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
   }
-  serverFetch(familyPath)
+  serverFetch(familyPath())
     .then(response =>
     {
       if (!response.ok) throw new Error(response.status === 404 ? 'family "' + FAMILY_ID + '" does not exist on the server yet' : 'server answered ' + response.status);
@@ -802,6 +761,17 @@ function loadFamilyTree()
     })
     .then(json =>
     {
+      if (!json || !json.rootPerson)
+      {
+        // The server has no tree for this family yet. Never let that wipe a tree kept in this browser.
+        if (data && data.rootPerson && canWrite()) { uploadDataToServer(); return; }
+        if (data && data.rootPerson) return;
+        document.getElementById('loadingState').innerHTML = `
+            <i class="fas fa-circle-info" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+            No family tree has been saved for this family yet.
+          `;
+        return;
+      }
       if (isUpdateRequired(json) || (!data && json))
       {
         data = json;
@@ -2076,23 +2046,6 @@ function expandAll()
   if (currentView === 'diagram') renderDiagramView();
 }
 
-async function onDBClick()
-{
-  setEditMode(false);
-  const code = await prompt("Enter your secret code to unlock controls");
-  if (+code == 7889)
-  {
-    const role = await prompt("Enter your role to unlock controls");
-    if (["root", "admin", "writer", "reader"].includes(role))
-    {
-      localStorage.setItem("role", role);
-      document.querySelector(".container").setAttribute("role", role);
-      return;
-    }
-  }
-  document.querySelector(".container").setAttribute("role", "reader");
-}
-
 // Collapse all sections
 function collapseAll()
 {
@@ -2469,7 +2422,7 @@ function uploadDataToServer()
   data.date = new Date().getTime();
   document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
   const jsonStr = JSON.stringify(data, null, 2);
-  serverFetch(familyPath, {
+  serverFetch(familyPath(), {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -2693,12 +2646,12 @@ document.addEventListener('keydown', function (e)
 
 function storeJsonLocally(data)
 {
-  localStorage.setItem(localKey, JSON.stringify(data));
+  localStorage.setItem(localKey(), JSON.stringify(data));
 }
 
 function retrieveJsonLocally()
 {
-  const data = localStorage.getItem(localKey);
+  const data = localStorage.getItem(localKey());
   if (!data) return null;
   return JSON.parse(data);
 }
@@ -2786,6 +2739,5 @@ window.setBranchExpanded = setBranchExpanded;
 window.unlinkCoParent = unlinkCoParent;
 window.closeLinkModal = closeLinkModal;
 window.importJSON = importJSON;
-window.onDBClick = onDBClick;
 window.navigateToPath = navigateToPath;
 window.setView = setView;
