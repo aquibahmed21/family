@@ -36,27 +36,31 @@ var _a;
     fetch(link.href, fetchOpts);
   }
 })();
-let data = null;
-let expandState = {};
-let currentView = localStorage.getItem("view") || "tree";
-if (currentView === "families") currentView = "relations";
 const POINTER_URL = "https://aquibahmed21.github.io/server/server-url.json";
-const FAMILY_ID = (() => {
-  const asked = new URLSearchParams(location.search).get("family");
-  try {
-    if (asked) localStorage.setItem("familyId", asked.toLowerCase());
-  } catch (e) {
-  }
-  let id = asked || (() => {
+const SESSION_KEY = "fam_session";
+const ROOT_FAMILY_KEY = "fam_root_family";
+const CACHE_PREFIX = "familyTreeData";
+const store = {
+  get(k) {
     try {
-      return localStorage.getItem("familyId");
+      return localStorage.getItem(k);
     } catch (e) {
       return null;
     }
-  })() || "default";
-  id = String(id).toLowerCase();
-  return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id) && id !== "photos" ? id : "default";
-})();
+  },
+  set(k, v) {
+    try {
+      localStorage.setItem(k, v);
+    } catch (e) {
+    }
+  },
+  del(k) {
+    try {
+      localStorage.removeItem(k);
+    } catch (e) {
+    }
+  }
+};
 let serverBase = null;
 async function resolveServer(force) {
   if (!force && serverBase) return serverBase;
@@ -78,27 +82,343 @@ async function resolveServer(force) {
   }
   return serverBase;
 }
-async function serverFetch(path, options) {
-  const attempt = async (force) => {
-    const base = await resolveServer(force);
-    const res = await fetch(base + path, options);
-    if (res.status === 530 || res.status === 502) throw new Error("tunnel " + res.status);
-    return res;
-  };
+function getSession() {
   try {
-    return await attempt(false);
+    return JSON.parse(store.get(SESSION_KEY)) || null;
   } catch (e) {
-    return await attempt(true);
+    return null;
   }
 }
-const familyPath = "/family/" + FAMILY_ID;
-const localKey = FAMILY_ID === "default" ? "familyTreeData" : "familyTreeData:" + FAMILY_ID;
-document.addEventListener("DOMContentLoaded", function() {
-  const role = localStorage.getItem("role") || "reader";
-  document.querySelector(".container").setAttribute("role", role);
+function setSession(s) {
+  store.set(SESSION_KEY, JSON.stringify(s));
+}
+function clearSession() {
+  store.del(SESSION_KEY);
+  store.del(ROOT_FAMILY_KEY);
+}
+function currentFamily() {
+  const s = getSession();
+  if (!s) return null;
+  return s.role === "root" ? store.get(ROOT_FAMILY_KEY) : s.family;
+}
+function uiRole() {
+  const s = getSession();
+  return !s ? "reader" : s.role === "viewer" ? "reader" : s.role;
+}
+const canWrite = () => {
+  var _a2;
+  return ["writer", "admin", "root"].includes((_a2 = getSession()) == null ? void 0 : _a2.role);
+};
+const familyPath = () => "/family/" + currentFamily();
+const localKey = () => CACHE_PREFIX + ":" + currentFamily();
+async function serverFetch(path, options = {}, { auth = true } = {}) {
+  const attempt = async (force) => {
+    const base = await resolveServer(force);
+    const headers = { ...options.headers || {} };
+    const s = getSession();
+    if (auth && s) headers.Authorization = "Bearer " + s.token;
+    const res2 = await fetch(base + path, { ...options, headers });
+    if (res2.status === 530 || res2.status === 502) throw new Error("tunnel " + res2.status);
+    return res2;
+  };
+  let res;
+  try {
+    res = await attempt(false);
+  } catch (e) {
+    res = await attempt(true);
+  }
+  if (res.status === 401 && auth && getSession()) {
+    clearSession();
+    showLogin("Your session ended. Please sign in again.");
+    throw new Error("login required");
+  }
+  return res;
+}
+async function api(path, method = "GET", body) {
+  const res = await serverFetch(path, body === void 0 ? { method } : { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  let out = null;
+  try {
+    out = await res.json();
+  } catch (e) {
+  }
+  if (!res.ok) throw new Error((out == null ? void 0 : out.error) || "server answered " + res.status);
+  return out;
+}
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (k === "class") el.className = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2), v);
+    else if (v !== false && v != null) el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat()) if (kid != null && kid !== false) el.append(kid.nodeType ? kid : document.createTextNode(kid));
+  return el;
+}
+function overlay(title, body, { closable = true, onClose } = {}) {
+  const close = () => {
+    box.remove();
+    onClose == null ? void 0 : onClose();
+  };
+  const box = h(
+    "div",
+    { class: "auth-overlay", role: "dialog", "aria-modal": "true" },
+    h(
+      "div",
+      { class: "auth-card" },
+      h("div", { class: "auth-head" }, h("h2", {}, title), closable ? h("button", { class: "auth-x", type: "button", "aria-label": "Close", onclick: close }, "×") : null),
+      body
+    )
+  );
+  if (closable) box.addEventListener("click", (e) => {
+    if (e.target === box) close();
+  });
+  document.body.append(box);
+  return { box, close };
+}
+const status = () => h("p", { class: "auth-msg", role: "status" });
+const say = (el, text, bad = true) => {
+  el.textContent = text;
+  el.classList.toggle("ok", !bad);
+};
+let loginWaiters = [];
+let loginBox = null;
+function showLogin(message) {
+  if (loginBox) {
+    loginBox.msg && say(loginBox.msg, message || "");
+    return;
+  }
+  const msg = status();
+  const id = h("input", { class: "auth-input", placeholder: "Family ID, e.g. sc_majid", autocomplete: "username", autocapitalize: "none", spellcheck: "false", required: true });
+  const pin = h("input", { class: "auth-input", type: "password", inputmode: "numeric", placeholder: "PIN", autocomplete: "current-password", required: true });
+  const go = h("button", { class: "auth-btn", type: "submit" }, "Sign in");
+  const form = h("form", { class: "auth-form" }, h("p", { class: "auth-hint" }, "Enter your family ID and PIN."), id, pin, go, msg);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    go.disabled = true;
+    say(msg, "");
+    try {
+      const r = await serverFetch("/auth/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: id.value, pin: pin.value }) }, { auth: false });
+      const out = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(out.error || "sign-in failed (" + r.status + ")");
+      setSession({ token: out.token, role: out.role, family: out.family, familyName: out.familyName, label: out.label });
+      loginBox.close();
+      loginBox = null;
+      loginWaiters.forEach((f) => f());
+      loginWaiters = [];
+    } catch (err) {
+      say(msg, err.message);
+      go.disabled = false;
+      pin.value = "";
+      pin.focus();
+    }
+  });
+  const o = overlay("Family tree", form, { closable: false });
+  loginBox = { close: o.close, msg };
+  if (message) say(msg, message);
+  setTimeout(() => id.focus(), 50);
+}
+function ensureLogin() {
+  if (getSession()) return Promise.resolve();
+  return new Promise((resolve) => {
+    loginWaiters.push(resolve);
+    showLogin();
+  });
+}
+function logout() {
+  clearSession();
+  location.reload();
+}
+function mountAccountUI() {
+  const s = getSession();
+  const btn2 = document.getElementById("acctBtn");
+  if (!btn2 || !s) return;
+  const fam = s.role === "root" ? currentFamily() || "all families" : s.familyName || s.family;
+  document.getElementById("acctLabel").textContent = `${s.label} · ${s.role}`;
+  btn2.title = `${fam} — account`;
+  btn2.hidden = false;
+  btn2.onclick = openAccount;
+}
+function row(...cells) {
+  return h("div", { class: "auth-row" }, ...cells);
+}
+const btn = (text, fn, cls = "") => h("button", { type: "button", class: "auth-btn small " + cls, onclick: fn }, text);
+function openAccount() {
+  const s = getSession();
+  if (!s) return;
+  const msg = status();
+  const body = h("div", { class: "auth-form" });
+  const o = overlay("Account", body);
+  const fam = s.role === "root" ? currentFamily() : s.family;
+  body.append(
+    h("p", { class: "auth-hint" }, `${s.label} · ${s.role}`, fam ? ` · ${fam}` : ""),
+    s.role === "root" ? btn("Families…", () => {
+      o.close();
+      openFamilies();
+    }) : null,
+    s.role === "admin" || s.role === "root" && fam ? btn("People with access…", () => {
+      o.close();
+      openAccess(fam);
+    }) : null,
+    btn("Change my PIN…", () => {
+      o.close();
+      openChangePin();
+    }),
+    btn("Log out", logout, "danger"),
+    msg
+  );
+}
+function openChangePin() {
+  const msg = status();
+  const cur = h("input", { class: "auth-input", type: "password", inputmode: "numeric", placeholder: "Current PIN", autocomplete: "current-password" });
+  const nw = h("input", { class: "auth-input", type: "password", inputmode: "numeric", placeholder: "New PIN (4-12 digits)", autocomplete: "new-password" });
+  const form = h("form", { class: "auth-form" }, cur, nw, h("button", { class: "auth-btn", type: "submit" }, "Change PIN"), msg);
+  const o = overlay("Change PIN", form);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const out = await api("/auth/change-pin", "POST", { current: cur.value, pin: nw.value });
+      setSession({ ...getSession(), token: out.token });
+      say(msg, "PIN changed.", false);
+      setTimeout(o.close, 900);
+    } catch (err) {
+      say(msg, err.message);
+    }
+  });
+}
+async function openFamilies(blocking = false) {
+  const msg = status();
+  const list = h("div", { class: "auth-list" });
+  const body = h("div", { class: "auth-form" }, list, msg);
+  const o = overlay("Families", body, { closable: !blocking });
+  const refresh = async () => {
+    list.replaceChildren(h("p", { class: "auth-hint" }, "Loading…"));
+    try {
+      const fams = await api("/families");
+      list.replaceChildren(...fams.length ? fams.map((f) => row(
+        h("div", { class: "auth-grow" }, h("strong", {}, f.name), h("small", {}, ` ${f.id} · ${f.users} PIN${f.users === 1 ? "" : "s"} · ${f.photos} photo${f.photos === 1 ? "" : "s"}`)),
+        btn("Open", () => {
+          store.set(ROOT_FAMILY_KEY, f.id);
+          location.reload();
+        }),
+        btn("Delete", async () => {
+          const typed = prompt(`This permanently deletes "${f.name}" with its tree, photos and PINs.
+Type the family id (${f.id}) to confirm:`);
+          if (typed !== f.id) return;
+          try {
+            await api("/family/" + f.id, "DELETE");
+            if (currentFamily() === f.id) store.del(ROOT_FAMILY_KEY);
+            refresh();
+          } catch (err) {
+            say(msg, err.message);
+          }
+        }, "danger")
+      )) : [h("p", { class: "auth-hint" }, "No families yet. Create the first one below.")]);
+    } catch (err) {
+      list.replaceChildren();
+      say(msg, err.message);
+    }
+  };
+  const id = h("input", { class: "auth-input", placeholder: "New family id, e.g. khan_family", autocapitalize: "none", spellcheck: "false" });
+  const name = h("input", { class: "auth-input", placeholder: "Display name (optional)" });
+  const pin = h("input", { class: "auth-input", inputmode: "numeric", placeholder: "Admin PIN for this family (4-12 digits)" });
+  const form = h("form", { class: "auth-form sub" }, h("h3", {}, "Create a family"), id, name, pin, h("button", { class: "auth-btn", type: "submit" }, "Create"));
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api("/families", "POST", { id: id.value.trim(), name: name.value.trim() || void 0, adminPin: pin.value.trim() });
+      id.value = name.value = pin.value = "";
+      say(msg, "Family created.", false);
+      refresh();
+    } catch (err) {
+      say(msg, err.message);
+    }
+  });
+  body.append(form, blocking ? btn("Log out", logout, "danger") : null);
+  refresh();
+  return o;
+}
+async function openAccess(family) {
+  const msg = status();
+  const list = h("div", { class: "auth-list" });
+  const body = h("div", { class: "auth-form" }, h("p", { class: "auth-hint" }, "Each person gets their own PIN and a role: viewer reads, writer edits, admin also manages access."), list, msg);
+  overlay("People with access · " + family, body);
+  const base = `/family/${family}/users`;
+  const refresh = async () => {
+    try {
+      const users = await api(base);
+      list.replaceChildren(...users.map((u) => {
+        const sel = h("select", { class: "auth-input slim", "aria-label": "Role" }, ...["viewer", "writer", "admin"].map((r) => h("option", { value: r, selected: r === u.role }, r)));
+        sel.addEventListener("change", async () => {
+          try {
+            await api(`${base}/${u.id}`, "PATCH", { role: sel.value });
+            say(msg, "Role updated.", false);
+          } catch (err) {
+            say(msg, err.message);
+            refresh();
+          }
+        });
+        return row(
+          h("div", { class: "auth-grow" }, h("strong", {}, u.label)),
+          sel,
+          btn("New PIN", async () => {
+            const p = prompt(`New PIN for ${u.label} (4-12 digits):`);
+            if (!p) return;
+            try {
+              await api(`${base}/${u.id}`, "PATCH", { pin: p.trim() });
+              say(msg, "PIN changed.", false);
+            } catch (err) {
+              say(msg, err.message);
+            }
+          }),
+          btn("Remove", async () => {
+            if (!confirm(`Remove ${u.label}? Their PIN will stop working.`)) return;
+            try {
+              await api(`${base}/${u.id}`, "DELETE");
+              refresh();
+            } catch (err) {
+              say(msg, err.message);
+            }
+          }, "danger")
+        );
+      }));
+    } catch (err) {
+      say(msg, err.message);
+    }
+  };
+  const label = h("input", { class: "auth-input", placeholder: "Name, e.g. Cousin Ali" });
+  const role = h("select", { class: "auth-input", "aria-label": "Role" }, ...["viewer", "writer", "admin"].map((r) => h("option", { value: r }, r)));
+  const pin = h("input", { class: "auth-input", inputmode: "numeric", placeholder: "PIN (4-12 digits)" });
+  const form = h("form", { class: "auth-form sub" }, h("h3", {}, "Add a person"), label, role, pin, h("button", { class: "auth-btn", type: "submit" }, "Add"));
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      await api(base, "POST", { label: label.value.trim(), role: role.value, pin: pin.value.trim() });
+      label.value = pin.value = "";
+      say(msg, "Added.", false);
+      refresh();
+    } catch (err) {
+      say(msg, err.message);
+    }
+  });
+  body.append(form);
+  refresh();
+}
+let data = null;
+let expandState = {};
+let currentView = localStorage.getItem("view") || "tree";
+if (currentView === "families") currentView = "relations";
+document.addEventListener("DOMContentLoaded", async function() {
   document.querySelector(".container").setAttribute("data-view", currentView);
-  loadFamilyTree();
   setupSearchAndFilters();
+  await ensureLogin();
+  mountAccountUI();
+  if (getSession().role === "root" && !currentFamily()) {
+    document.getElementById("loadingState").style.display = "none";
+    openFamilies(true);
+    return;
+  }
+  document.querySelector(".container").setAttribute("role", uiRole());
+  loadFamilyTree();
 });
 function getCurrentRole() {
   var _a2;
@@ -108,10 +428,10 @@ function setView(view) {
   currentView = view;
   localStorage.setItem("view", view);
   document.querySelector(".container").setAttribute("data-view", view);
-  document.querySelectorAll(".view-btn").forEach((btn) => {
-    const active = btn.dataset.view === view;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  document.querySelectorAll(".view-btn").forEach((btn2) => {
+    const active = btn2.dataset.view === view;
+    btn2.classList.toggle("active", active);
+    btn2.setAttribute("aria-pressed", active ? "true" : "false");
   });
   if (data) {
     applyViewVisibility();
@@ -127,10 +447,10 @@ const VIEW_PANES = {
 };
 function applyViewVisibility() {
   queueMicrotask(renderPinnedBar);
-  document.querySelectorAll(".view-btn").forEach((btn) => {
-    const active = btn.dataset.view === currentView;
-    btn.classList.toggle("active", active);
-    btn.setAttribute("aria-pressed", active ? "true" : "false");
+  document.querySelectorAll(".view-btn").forEach((btn2) => {
+    const active = btn2.dataset.view === currentView;
+    btn2.classList.toggle("active", active);
+    btn2.setAttribute("aria-pressed", active ? "true" : "false");
   });
   Object.entries(VIEW_PANES).forEach(([view, [id, display]]) => {
     const pane = document.getElementById(id);
@@ -542,7 +862,7 @@ function renderColumnsView() {
     valid.push(p2);
   }
   columnsSel = valid.length ? valid : ["root"];
-  const row = (m, path, selected) => {
+  const row2 = (m, path, selected) => {
     const hasKin = m.spouses && m.spouses.length || m.children && m.children.length;
     const meta = role === "reader" ? "" : [m.maritalStatus, isDeceasedMember(m) ? "deceased" : ""].filter(Boolean).join(" · ");
     return `<button type="button" class="col-row${selected ? " selected" : ""}" data-path="${path}">
@@ -556,9 +876,9 @@ function renderColumnsView() {
     const rows = list.map((m, i) => ({ m, path: `${parentPath}.${type}[${i}]` })).filter((x) => canSee(x.m, role));
     if (!rows.length) return "";
     return `<h4 class="col-title"><i class="fas ${icon}"></i> ${title} <span>${rows.length}</span></h4>
-      ${rows.map((x) => row(x.m, x.path, x.path === selectedPath)).join("")}`;
+      ${rows.map((x) => row2(x.m, x.path, x.path === selectedPath)).join("")}`;
   };
-  const columns = [`<div class="col"><h4 class="col-title"><i class="fas fa-seedling"></i> Family head</h4>${row(data.rootPerson, "root", columnsSel[0] === "root")}</div>`];
+  const columns = [`<div class="col"><h4 class="col-title"><i class="fas fa-seedling"></i> Family head</h4>${row2(data.rootPerson, "root", columnsSel[0] === "root")}</div>`];
   columnsSel.forEach((path, i) => {
     const parent = safeGetByPath(path);
     const next = columnsSel[i + 1];
@@ -674,10 +994,22 @@ function loadFamilyTree() {
     collapseAll();
     document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
   }
-  serverFetch(familyPath).then((response) => {
+  serverFetch(familyPath()).then((response) => {
     if (!response.ok) throw new Error(response.status === 404 ? 'family "' + FAMILY_ID + '" does not exist on the server yet' : "server answered " + response.status);
     return response.json();
   }).then((json) => {
+    if (!json || !json.rootPerson) {
+      if (data && data.rootPerson && canWrite()) {
+        uploadDataToServer();
+        return;
+      }
+      if (data && data.rootPerson) return;
+      document.getElementById("loadingState").innerHTML = `
+            <i class="fas fa-circle-info" style="color: var(--warning-color); margin-right: 0.5rem;"></i>
+            No family tree has been saved for this family yet.
+          `;
+      return;
+    }
     if (isUpdateRequired(json) || !data && json) {
       data = json;
       storeJsonLocally(data);
@@ -875,16 +1207,16 @@ function setupSearchAndFilters() {
   const insightsBtn = document.getElementById("insightsBtn");
   const dataPanel = document.getElementById("dataPanel");
   const dataBtn = document.getElementById("dataBtn");
-  const menus = [[insightsBtn, statsPanel], [dataBtn, dataPanel]].filter(([btn, panel]) => btn && panel);
-  const closeMenus = () => menus.forEach(([btn, panel]) => {
+  const menus = [[insightsBtn, statsPanel], [dataBtn, dataPanel]].filter(([btn2, panel]) => btn2 && panel);
+  const closeMenus = () => menus.forEach(([btn2, panel]) => {
     panel.hidden = true;
-    btn.setAttribute("aria-expanded", "false");
+    btn2.setAttribute("aria-expanded", "false");
   });
-  menus.forEach(([btn, panel]) => btn.addEventListener("click", () => {
+  menus.forEach(([btn2, panel]) => btn2.addEventListener("click", () => {
     const open = panel.hidden;
     closeMenus();
     panel.hidden = !open;
-    btn.setAttribute("aria-expanded", String(open));
+    btn2.setAttribute("aria-expanded", String(open));
   }));
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".insights")) closeMenus();
@@ -1171,8 +1503,8 @@ document.getElementById("linkPerson").addEventListener("keydown", (e) => {
   }
 });
 document.getElementById("linkList").addEventListener("click", (e) => {
-  const btn = e.target.closest(".link-remove");
-  if (btn) removeLink(+btn.dataset.owner, +btn.dataset.other, btn.dataset.type);
+  const btn2 = e.target.closest(".link-remove");
+  if (btn2) removeLink(+btn2.dataset.owner, +btn2.dataset.other, btn2.dataset.type);
 });
 document.getElementById("linkModal").addEventListener("mousedown", (e) => {
   if (e.target.id === "linkModal") closeLinkModal();
@@ -1267,13 +1599,13 @@ function canEditInline() {
 }
 let pendingEdits = 0;
 function syncEditButton() {
-  const btn = document.getElementById("editModeBtn");
-  if (!btn) return;
+  const btn2 = document.getElementById("editModeBtn");
+  if (!btn2) return;
   const editing = document.querySelector(".container").hasAttribute("data-edit");
-  btn.setAttribute("aria-pressed", String(editing));
-  btn.classList.toggle("active", editing);
-  btn.querySelector("i").className = `fas ${editing ? "fa-check" : "fa-pen-to-square"}`;
-  btn.querySelector(".btn-label").textContent = editing ? pendingEdits ? `Done (${pendingEdits})` : "Done" : "Quick edit";
+  btn2.setAttribute("aria-pressed", String(editing));
+  btn2.classList.toggle("active", editing);
+  btn2.querySelector("i").className = `fas ${editing ? "fa-check" : "fa-pen-to-square"}`;
+  btn2.querySelector(".btn-label").textContent = editing ? pendingEdits ? `Done (${pendingEdits})` : "Done" : "Quick edit";
 }
 function setEditMode(on) {
   const container = document.querySelector(".container");
@@ -1643,19 +1975,6 @@ function expandAll() {
   renderTree();
   if (currentView === "diagram") renderDiagramView();
 }
-async function onDBClick() {
-  setEditMode(false);
-  const code = await prompt("Enter your secret code to unlock controls");
-  if (+code == 7889) {
-    const role = await prompt("Enter your role to unlock controls");
-    if (["root", "admin", "writer", "reader"].includes(role)) {
-      localStorage.setItem("role", role);
-      document.querySelector(".container").setAttribute("role", role);
-      return;
-    }
-  }
-  document.querySelector(".container").setAttribute("role", "reader");
-}
 function collapseAll() {
   function setAllCollapsed(obj, currentPath) {
     if (!obj) return;
@@ -1920,7 +2239,7 @@ function uploadDataToServer() {
   data.date = (/* @__PURE__ */ new Date()).getTime();
   document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
   const jsonStr = JSON.stringify(data, null, 2);
-  serverFetch(familyPath, {
+  serverFetch(familyPath(), {
     method: "POST",
     headers: {
       "Content-Type": "application/json"
@@ -2072,10 +2391,10 @@ document.addEventListener("keydown", function(e) {
   }
 });
 function storeJsonLocally(data2) {
-  localStorage.setItem(localKey, JSON.stringify(data2));
+  localStorage.setItem(localKey(), JSON.stringify(data2));
 }
 function retrieveJsonLocally() {
-  const data2 = localStorage.getItem(localKey);
+  const data2 = localStorage.getItem(localKey());
   if (!data2) return null;
   return JSON.parse(data2);
 }
@@ -2142,6 +2461,5 @@ window.setBranchExpanded = setBranchExpanded;
 window.unlinkCoParent = unlinkCoParent;
 window.closeLinkModal = closeLinkModal;
 window.importJSON = importJSON;
-window.onDBClick = onDBClick;
 window.navigateToPath = navigateToPath;
 window.setView = setView;
