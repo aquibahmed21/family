@@ -3,7 +3,56 @@ let data = null;
 let expandState = {};
 let currentView = localStorage.getItem('view') || 'tree';
 if (currentView === 'families') currentView = 'relations'; // renamed view
-const baseURL = 'https://web-push-3zaz.onrender.com/';
+
+// ---- Server address -------------------------------------------------------------------------
+// The server runs on a phone behind a Cloudflare quick tunnel whose address changes. A static
+// pointer file always holds the current one, so it is looked up here instead of being hard-coded.
+const POINTER_URL = 'https://aquibahmed21.github.io/server/server-url.json';
+const FAMILY_ID = (() =>
+{
+  // ?family=sharma picks another family; the choice is remembered. Default: "default".
+  const asked = new URLSearchParams(location.search).get('family');
+  try { if (asked) localStorage.setItem('familyId', asked.toLowerCase()); } catch (e) { /* storage blocked */ }
+  let id = asked || (() => { try { return localStorage.getItem('familyId'); } catch (e) { return null; } })() || 'default';
+  id = String(id).toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{0,63}$/.test(id) && id !== 'photos' ? id : 'default';
+})();
+let serverBase = null;
+
+async function resolveServer(force)
+{
+  if (!force && serverBase) return serverBase;
+  if (!force)
+  {
+    try { serverBase = sessionStorage.getItem('serverBase'); } catch (e) { /* ignore */ }
+    if (serverBase) return serverBase;
+  }
+  const r = await fetch(POINTER_URL + '?t=' + Date.now(), { cache: 'no-store' });
+  if (!r.ok) throw new Error('Could not find the server (pointer HTTP ' + r.status + ')');
+  const p = await r.json();
+  if (!p.server_url) throw new Error('The server is offline right now');
+  serverBase = String(p.server_url).replace(/\/+$/, '');
+  try { sessionStorage.setItem('serverBase', serverBase); } catch (e) { /* ignore */ }
+  return serverBase;
+}
+
+/** fetch() against the current server; if it is unreachable, look the address up again once. */
+async function serverFetch(path, options)
+{
+  const attempt = async force =>
+  {
+    const base = await resolveServer(force);
+    const res = await fetch(base + path, options);
+    // Cloudflare answers 530/502/404-html when the old tunnel address is gone
+    if (res.status === 530 || res.status === 502) throw new Error('tunnel ' + res.status);
+    return res;
+  };
+  try { return await attempt(false); }
+  catch (e) { return await attempt(true); }
+}
+const familyPath = '/family/' + FAMILY_ID;
+// The default family keeps the old cache key, so nothing already saved in the browser is lost.
+const localKey = FAMILY_ID === 'default' ? 'familyTreeData' : 'familyTreeData:' + FAMILY_ID;
 
 // Initialize the application
 document.addEventListener('DOMContentLoaded', function ()
@@ -745,8 +794,12 @@ function loadFamilyTree()
     collapseAll();
     document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date ?? 0);
   }
-  fetch(baseURL + 'family')
-    .then(response => response.json())
+  serverFetch(familyPath)
+    .then(response =>
+    {
+      if (!response.ok) throw new Error(response.status === 404 ? 'family "' + FAMILY_ID + '" does not exist on the server yet' : 'server answered ' + response.status);
+      return response.json();
+    })
     .then(json =>
     {
       if (isUpdateRequired(json) || (!data && json))
@@ -2416,7 +2469,7 @@ function uploadDataToServer()
   data.date = new Date().getTime();
   document.querySelector("#lastUpdated").textContent = GetDisplayTime(data.date);
   const jsonStr = JSON.stringify(data, null, 2);
-  fetch(baseURL + 'family', {
+  serverFetch(familyPath, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -2640,12 +2693,12 @@ document.addEventListener('keydown', function (e)
 
 function storeJsonLocally(data)
 {
-  localStorage.setItem('familyTreeData', JSON.stringify(data));
+  localStorage.setItem(localKey, JSON.stringify(data));
 }
 
 function retrieveJsonLocally()
 {
-  const data = localStorage.getItem('familyTreeData');
+  const data = localStorage.getItem(localKey);
   if (!data) return null;
   return JSON.parse(data);
 }
